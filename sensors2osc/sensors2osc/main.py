@@ -53,7 +53,31 @@ class EHealth2OSC(Forwarder):
         super(EHealth2OSC, self).__init__(actor, platform, device)
 
     def handleRead(self, osc_sock):
-        pass
+        data = self.serial.readline()[:-2]
+        print repr(data)
+        try:
+            airFlow, emg, temp = data.split(";")
+        except ValueError:
+            return
+        try:
+            airFlow = int(airFlow)
+            emg = int(emg)
+            temp = int(temp);
+        except ValueError:
+            return
+        osc_message = OSCMessage("/%s/airFlow" % self.actor)
+        osc_message.appendTypedArg(airFlow, "i")
+        osc_sock.sendall(osc_message.encode_osc())
+        osc_message = OSCMessage("/%s/emg" % self.actor)
+        osc_message.appendTypedArg(emg, "i")
+        osc_sock.sendall(osc_message.encode_osc())
+        osc_message = OSCMessage("/%s/temperatur" % self.actor)
+        osc_message.appendTypedArg(temp, "i")
+        osc_sock.sendall(osc_message.encode_osc())
+
+
+
+
 
 
 class EKG2OSC(Forwarder):
@@ -150,7 +174,8 @@ def main():
         }
 
     naming = {
-        "/dev/ttyACM0" : ["merle", "pulse"],
+        #"/dev/ttyACM0" : ["merle", "pulse"],
+        "/dev/ttyUSB0" : ["merle", "ehealth"],
         #"/dev/ttyACM1" : ["merle", "pulse"]
         }
 
