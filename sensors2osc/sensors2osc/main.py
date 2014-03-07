@@ -21,21 +21,6 @@ except ImportError as e:
     from chaosc.osc_lib import *
 
 
-parser = argparse.ArgumentParser(prog='psychose_actor')
-parser.add_argument("-H", '--chaosc_host', required=True,
-    type=str, help='host of chaosc instance to control')
-parser.add_argument("-p", '--chaosc_port', required=True,
-    type=int, help='port of chaosc instance to control')
-
-
-args = parser.parse_args(sys.argv[1:])
-
-connections = list()
-osc_sock = socket.socket(2, 2, 17)
-osc_sock.connect((args.chaosc_host, args.chaosc_port))
-
-
-
 class Forwarder(object):
     def __init__(self, actor, platform, device):
         self.actor = actor
@@ -102,50 +87,66 @@ class Pulse2OSC(Forwarder):
         osc_sock.sendall(osc_message.encode_osc())
 
 
-naming = {
-    "/dev/ttyUSB0" : ["merle", "ehealth"],
-    "/dev/ttyUSB1" : ["merle", "ekg"],
-    "/dev/ttyUSB2" : ["merle", "pulse"],
-    "/dev/ttyUSB3" : ["bjoern", "ehealth"],
-    "/dev/ttyUSB4" : ["bjoern", "ekg"],
-    "/dev/ttyUSB5" : ["bjoern", "pulse"],
-    "/dev/ttyUSB6" : ["uwe", "ehealth"],
-    "/dev/ttyUSB7" : ["uwe", "ekg"],
-    "/dev/ttyUSB8" : ["uwe", "pulse"]
-    }
 
-naming = {
-    "/tmp/tty2" : ["merle", "ehealth"],
-    "/tmp/tty4" : ["merle", "pulse"]
-    }
+def main():
+    parser = argparse.ArgumentParser(prog='psychose_actor')
+    parser.add_argument("-H", '--chaosc_host', required=True,
+        type=str, help='host of chaosc instance to control')
+    parser.add_argument("-p", '--chaosc_port', required=True,
+        type=int, help='port of chaosc instance to control')
 
-used_devices = dict()
 
-while 1:
-    for device, description in naming.iteritems():
-        if os.path.exists(device):
-            if device not in used_devices:
-                actor, platform = naming[device]
-                if description[1] == "ehealth":
-                    used_devices[device] = EHealth2OSC(actor, platform, device)
-                elif description[1] == "ekg":
-                    used_devices[device] = EKG2OSC(actor, platform, device)
-                elif description[1] == "pulse":
-                    used_devices[device] = Pulse2OSC(actor, platform, device)
-                else:
-                    raise ValueError("unknown description %r for device %r" % (description, device))
-        else:
-            print "device missing", device
-            m = OSCMessage("/DeviceMissing")
-            m.appendTypedArg(description[0], "s")
-            m.appendTypedArg(description[1], "s")
-            osc_sock.sendall(m.encode_osc())
+    args = parser.parse_args(sys.argv[1:])
 
-    read_map = {}
-    for forwarder in used_devices.values():
-        read_map[forwarder.serial] = forwarder.handleRead
+    connections = list()
+    osc_sock = socket.socket(2, 2, 17)
+    osc_sock.connect((args.chaosc_host, args.chaosc_port))
 
-    readers, writers, errors = select.select(read_map, [], [], 0.1)
-    print "readers", readers
-    for reader in readers:
-        read_map[reader](osc_sock)
+
+    naming = {
+        "/dev/ttyUSB0" : ["merle", "ehealth"],
+        "/dev/ttyUSB1" : ["merle", "ekg"],
+        "/dev/ttyUSB2" : ["merle", "pulse"],
+        "/dev/ttyUSB3" : ["bjoern", "ehealth"],
+        "/dev/ttyUSB4" : ["bjoern", "ekg"],
+        "/dev/ttyUSB5" : ["bjoern", "pulse"],
+        "/dev/ttyUSB6" : ["uwe", "ehealth"],
+        "/dev/ttyUSB7" : ["uwe", "ekg"],
+        "/dev/ttyUSB8" : ["uwe", "pulse"]
+        }
+
+    naming = {
+        "/tmp/tty2" : ["merle", "ehealth"],
+        "/tmp/tty4" : ["merle", "pulse"]
+        }
+
+    used_devices = dict()
+
+    while 1:
+        for device, description in naming.iteritems():
+            if os.path.exists(device):
+                if device not in used_devices:
+                    actor, platform = naming[device]
+                    if description[1] == "ehealth":
+                        used_devices[device] = EHealth2OSC(actor, platform, device)
+                    elif description[1] == "ekg":
+                        used_devices[device] = EKG2OSC(actor, platform, device)
+                    elif description[1] == "pulse":
+                        used_devices[device] = Pulse2OSC(actor, platform, device)
+                    else:
+                        raise ValueError("unknown description %r for device %r" % (description, device))
+            else:
+                print "device missing", device
+                m = OSCMessage("/DeviceMissing")
+                m.appendTypedArg(description[0], "s")
+                m.appendTypedArg(description[1], "s")
+                osc_sock.sendall(m.encode_osc())
+
+        read_map = {}
+        for forwarder in used_devices.values():
+            read_map[forwarder.serial] = forwarder.handleRead
+
+        readers, writers, errors = select.select(read_map, [], [], 0.1)
+        print "readers", readers
+        for reader in readers:
+            read_map[reader](osc_sock)
