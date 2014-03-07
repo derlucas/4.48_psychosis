@@ -12,6 +12,7 @@ import socket
 import sys
 import time
 import struct
+import datetime
 
 
 try:
@@ -60,31 +61,64 @@ class EKG2OSC(Forwarder):
         super(EKG2OSC, self).__init__(actor, platform, device)
 
     def handleRead(self, osc_sock):
-        pass
+        t = ord(self.serial.read(1))
+        osc_message = OSCMessage("/%s/ekg" % self.actor)
+        osc_message.appendTypedArg(t, "i")
+        osc_sock.sendall(osc_message.encode_osc())
 
 
 
 class Pulse2OSC(Forwarder):
     def __init__(self, actor, platform, device):
         super(Pulse2OSC, self).__init__(actor, platform, device)
+        self.buf = [0 for i in xrange(24)]
+        self.position = 0
+        self.start = -1
+        self.heartbeat_send = False
 
     def handleRead(self, osc_sock):
-        t = self.serial.read(5)
-        print repr(t)
-        sync1, sync2, heart_signal, heart_rate, o2 = struct.unpack("BBBBB", t)
-        print sync1, sync2, heart_signal, heart_rate, o2
-        if heart_signal > 200:
-            osc_message = OSCMessage("/%s/heartbeat" % self.actor)
-            osc_message.appendTypedArg(1, "i")
-            osc_sock.sendall(osc_message.encode_osc())
+        t = ord(self.serial.read(1))
+        pos = (self.position + 1) % 24
+        self.buf[pos] = t
+        self.position = pos
+        if t == 0:
+            self.start = pos
 
-        osc_message = OSCMessage("/%s/o2" % self.actor)
-        osc_message.appendTypedArg(o2, "i")
-        osc_sock.sendall(osc_message.encode_osc())
+        #print "start", self.start
+        if self.start > -1:
+            data = range(6)
+            for i in range(6):
+                data[i] = self.buf[(self.start + i) % 24]
 
-        osc_message = OSCMessage("/%s/heartrate" % self.actor)
-        osc_message.appendTypedArg(heart_rate, "i")
-        osc_sock.sendall(osc_message.encode_osc())
+            sync1, sync2, heart_signal, heart_rate, o2, pulse = data
+
+            #print sync1, sync2, heart_signal, heart_rate, o2, pulse
+            if pulse == 245 and not self.heartbeat_send:
+                osc_message = OSCMessage("/%s/heartbeat" % self.actor)
+                osc_message.appendTypedArg(1, "i")
+                osc_message.appendTypedArg(heart_rate, "i")
+                osc_message.appendTypedArg(o2, "i")
+                osc_sock.sendall(osc_message.encode_osc())
+                print "heartbeat", datetime.datetime.now(), heart_signal
+                self.heartbeat_send = True
+            elif pulse == 1 and self.heartbeat_send:
+                #print "off heartbeat", datetime.datetime.now(), heart_signal
+                self.heartbeat_send = False
+                osc_message = OSCMessage("/%s/heartbeat" % self.actor)
+                osc_message.appendTypedArg(0, "i")
+                osc_message.appendTypedArg(heart_rate, "i")
+                osc_message.appendTypedArg(o2, "i")
+                osc_sock.sendall(osc_message.encode_osc())
+
+            #osc_message = OSCMessage("/%s/o2" % self.actor)
+            #osc_message.appendTypedArg(o2, "i")
+            #osc_sock.sendall(osc_message.encode_osc())
+
+            #osc_message = OSCMessage("/%s/heartrate" % self.actor)
+            #osc_message.appendTypedArg(heart_rate, "i")
+            #osc_sock.sendall(osc_message.encode_osc())
+            self.start = -1
+
 
 
 
@@ -116,8 +150,8 @@ def main():
         }
 
     naming = {
-        "/tmp/tty2" : ["merle", "ehealth"],
-        "/tmp/tty4" : ["merle", "pulse"]
+        "/dev/ttyACM0" : ["merle", "pulse"],
+        #"/dev/ttyACM1" : ["merle", "pulse"]
         }
 
     used_devices = dict()
@@ -128,10 +162,13 @@ def main():
                 if device not in used_devices:
                     actor, platform = naming[device]
                     if description[1] == "ehealth":
+                        print device, actor, platform
                         used_devices[device] = EHealth2OSC(actor, platform, device)
                     elif description[1] == "ekg":
+                        print device, actor, platform
                         used_devices[device] = EKG2OSC(actor, platform, device)
                     elif description[1] == "pulse":
+                        print device, actor, platform
                         used_devices[device] = Pulse2OSC(actor, platform, device)
                     else:
                         raise ValueError("unknown description %r for device %r" % (description, device))
@@ -147,6 +184,6 @@ def main():
             read_map[forwarder.serial] = forwarder.handleRead
 
         readers, writers, errors = select.select(read_map, [], [], 0.1)
-        print "readers", readers
+        #print "readers", readers
         for reader in readers:
             read_map[reader](osc_sock)
