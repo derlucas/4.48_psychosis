@@ -20,8 +20,6 @@
 
 import socket, argparse, sys
 
-from chaosc.simpleOSCServer import SimpleOSCServer
-
 
 try:
     from chaosc.c_osc_lib import OSCMessage, decode_osc
@@ -30,27 +28,66 @@ except ImportError, e:
     from chaosc.osc_lib import OSCMessage, decode_osc
 
 
+def send(sock, binary, args):
+    sent = sock.sendto(binary, (args.osc2cam_host, args.osc2cam_port))
+    response = sock.recv(4096)
+    if response:
+        osc_address, typetags, arguments = decode_osc(response, 0, len(response))
+        print osc_address, arguments
 
 
-def test_moveCam(args, cam_id, sock):
-    directions = ("home", "up", "down", "left", "right", "upleft", "upright", "downleft", "downright", "repeat", "stop")
+def test_move_cam(args, cam_id, sock):
+    directions = ("home", "up", "down", "left", "right", "upleft", "upright", "downleft", "downright")
     for direction in directions:
-        moveCam = OSCMessage("/moveCam")
-        moveCam.appendTypedArg(cam_id, "i")
-        moveCam.appendTypedArg(direction, "s")
-        binary = moveCam.encode_osc()
+        message = OSCMessage("/moveCam")
+        message.appendTypedArg(cam_id, "i")
+        message.appendTypedArg(direction, "s")
+        binary = message.encode_osc()
+        send(sock, binary, args)
 
-        try:
-            sent = sock.sendto(binary, (args.osc2cam_host, args.osc2cam_port))
-        except socket.error, e:
-            if e[0] in (7, 65):     # 7 = 'no address associated with nodename',  65 = 'no route to host'
-                raise e
-            else:
-                raise Exception("while sending OSCMessage 'moveCam' for cam_id %r with direction %r to %r:%r: %s" % (cam_id, direction, args.osc2cam_host, args.osc2cam_port, str(e)))
-        response = sock.recv(4096)
-        if response:
-            osc_address, typetags, arguments = decode_osc(response, 0, len(response))
-            print osc_address, arguments
+
+def test_use_cam_preset(args, cam_id, sock):
+    for i in range(10):
+        message = OSCMessage("/useCamPreset")
+        message.appendTypedArg(cam_id, "i")
+        message.appendTypedArg(i, "i")
+        binary = message.encode_osc()
+        send(sock, binary, args)
+
+
+def test_set_cam_preset(args, cam_id, sock):
+    message = OSCMessage("/setCamPreset")
+    message.appendTypedArg(cam_id, "i")
+    message.appendTypedArg(0, "i")
+    binary = message.encode_osc()
+    send(sock, binary, args)
+
+
+def test_zoom_cam(args, cam_id, sock):
+    for i in (1, 5000, 9999):
+        message = OSCMessage("/zoomCam")
+        message.appendTypedArg(cam_id, "i")
+        message.appendTypedArg(i, "i")
+        binary = message.encode_osc()
+        send(sock, binary, args)
+
+
+def test_focus_cam(args, cam_id, sock):
+    for i in (1, 5000, 9999):
+        message = OSCMessage("/focusCam")
+        message.appendTypedArg(cam_id, "i")
+        message.appendTypedArg(i, "i")
+        binary = message.encode_osc()
+        send(sock, binary, args)
+
+
+def test_toggle_night_view(args, cam_id, sock):
+    for i in ("on", "off"):
+        message = OSCMessage("/toggleNightView")
+        message.appendTypedArg(cam_id, "i")
+        message.appendTypedArg(i, "s")
+        binary = message.encode_osc()
+        send(sock, binary, args)
 
 
 
@@ -87,6 +124,11 @@ def main():
     #sock.connect((args.osc2cam_host, args.osc2cam_port))
 
     for ix, (host, port) in enumerate(cams):
-        test_moveCam(args, ix, sock)
+        test_move_cam(args, ix, sock)
+        test_use_cam_preset(args, ix, sock)
+        test_set_cam_preset(args, ix, sock)
+        test_zoom_cam(args, ix, sock)
+        test_focus_cam(args, ix, sock)
+        test_toggle_night_view(args, ix, sock)
 
 main()
