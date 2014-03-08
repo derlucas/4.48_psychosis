@@ -113,21 +113,18 @@ class OSC2CamServer(SimpleOSCServer):
 
     def dispatchMessage(self, osc_address, typetags, args, packet, client_address):
         """ dispatches parsed osc messages to the ip cam command methods"""
-        rule = re.compile("^/(.*?)/(\d+)/(.*?)$")
-        res = rule.match(osc_address)
-        if res:
-            _, cam_id, command = res.groups()
-            cam_id = int(cam_id)
-            if command == "moveCam":
-                self.move_cam(cam_id, args)
-            elif command == "setCamPreset":
-                self.set_cam_preset(cam_id, args)
-            elif command == "useCamPreset":
-                self.use_cam_preset(cam_id, args)
-            elif command == "zoomCam":
-                self.zoom_cam(cam_id, args)
-            elif command == "toggleNightView":
-                self.toggle_night_view(cam_id, args)
+
+        cam_id = args.pop(0)
+        if osc_address == "/moveCam":
+            self.move_cam(cam_id, args)
+        elif osc_address == "/setCamPreset":
+            self.set_cam_preset(cam_id, args)
+        elif osc_address == "/useCamPreset":
+            self.use_cam_preset(cam_id, args)
+        elif osc_address == "/zoomCam":
+            self.zoom_cam(cam_id, args)
+        elif osc_address == "/toggleNightView":
+            self.toggle_night_view(cam_id, args)
 
 
 def main():
