@@ -6,7 +6,14 @@ import re
 import sys
 import httplib
 
+from datetime import datetime
 from chaosc.simpleOSCServer import SimpleOSCServer
+
+try:
+    from chaosc.c_osc_lib import OSCMessage
+except ImportError, e:
+    print e
+    from chaosc.osc_lib import OSCMessage
 
 
 class OSC2CamServer(SimpleOSCServer):
@@ -27,37 +34,67 @@ class OSC2CamServer(SimpleOSCServer):
 
         SimpleOSCServer.__init__(self, ("", args.port))
 
+        self.args = args
         self.set_url = "/cgi-bin/admin/"
         self.get_url = "/cgi-bin/view/"
         self.ptz_ctl_url = "/cgi-bin/operator/ptzset"
         self.ptz_config_url = "/cgi-bin/operator/ptzconfig"
+        self.parse_cam_config()
         self.connections = [httplib.HTTPConnection(host, port) for host, port in cams]
         self.resetCams()
+        self.targets = list()
+
+
+    def parse_cam_config(self):
+        lines = open(self.args.cam_config_file).readlines()
+        cams = list()
+        for line in lines:
+            host, port = line.split(",")
+            host = host.strip()
+            port = int(port.strip())
+            cams.append((host, port))
+        return cams
+
+
+    def handleConnResult(self, connection, client_address=None, cmd=None):
+        conn_result = connection.getresponse()
+        if client_address is not None:
+            response = OSCMessage("/Response")
+            response.appendTypedArg(cmd, "s")
+            response.appendTypedArg(conn_result.status, "i")
+            response.appendTypedArg(conn_result.reason, "s")
+            self.socket.sendto(response.encode_osc(), client_address)
+
+        if conn_result.status != 200:
+            print "%s. Error: %d, %s" % (datetime.now().strftime("%x %X"), conn_result.status, conn_result.reason)
+
+
 
     def resetCams(self):
         """ configures each ip cam"""
 
-        for connection in self.connections:
+        now = datetime.now().strftime("%x %X")
+        for ix, connection in enumerate(self.connections):
+            print "%s: resetting camera %d to: resolution 640x480, 75%% compression and 25 fps" % (now, ix)
             connection.request("GET", "%sparam?action=update&Image.I0.MJPEG.Resolution=640x480" % self.set_url)
-            conn_result = connection.getresponse()
-            print conn_result.status, conn_result.reason
+            self.handleConnResult(connection, None)
             connection.request("GET", "%sparam?action=update&Image.I0.Appearance.Compression=75" % self.set_url)
-            conn_result = connection.getresponse()
-            print conn_result.status, conn_result.reason
+            self.handleConnResult(connection, None)
             connection.request("GET", "%sparam?action=update&Image.I0.MJPEG.FPS=25" % self.set_url)
-            conn_result = connection.getresponse()
-            print conn_result.status, conn_result.reason
+            self.handleConnResult(connection, None)
 
 
-    def move_cam(self, cam_id, args):
+    def move_cam(self, cam_id, args, client_address):
         """ moves given ip cam"""
 
         direction = args[0]
+        now = datetime.now().strftime("%x %X")
         if direction in ("home", "up", "down", "left", "right", "upleft", "upright", "downleft", "downright", "repeat", "stop"):
+            print "%s: move camera %d to: dir %r" % (now, cam_id, direction)
             connection = self.connections[cam_id]
             connection.request("GET", "%s?move=%s" % (self.ptz_ctl_url, direction))
-            conn_result = connection.getresponse()
-            print conn_result.status, conn_result.reason
+            self.handleConnResult(connection, client_address, "moveCam")
+
 
 
     def use_cam_preset(self, cam_id, args):
@@ -65,9 +102,11 @@ class OSC2CamServer(SimpleOSCServer):
 
         presetno = args[0]
         connection = self.connections[cam_id]
+        now = datetime.now().strftime("%x %X")
+        print "%s: use camera %d preset %d" % (now, cam_id, presetno)
+
         connection.request("GET", "%s?gotoserverpresetno=%d" % (self.ptz_ctl_url, presetno))
-        conn_result = connection.getresponse()
-        print conn_result.status, conn_result.reason
+        self.handleConnResult(connection, client_address, "useCamPreset")
 
 
     def set_cam_preset(self, cam_id, args):
@@ -76,8 +115,7 @@ class OSC2CamServer(SimpleOSCServer):
         presetno = args[0]
         connection = self.connections[cam_id]
         connection.request("GET", "%s?setserverpresetno=%d&home=yes" % (self.ptz_config_url, presetno))
-        conn_result = connection.getresponse()
-        print conn_result.status, conn_result.reason
+        self.handleConnResult(connection, client_address, "setCamPreset")
 
 
     def zoom_cam(self, cam_id, args):
@@ -91,8 +129,7 @@ class OSC2CamServer(SimpleOSCServer):
             direction = 1
         connection = self.connections[cam_id]
         connection.request("GET", "%s?zoom=%s" % (self.ptz_ctl_url, direction))
-        conn_result = connection.getresponse()
-        print conn_result.status, conn_result.reason
+        self.handleConnResult(connection, client_address, "zoomCam")
 
 
     def toggle_night_view(self, cam_id, args):
@@ -107,16 +144,16 @@ class OSC2CamServer(SimpleOSCServer):
 
         connection = self.connections[cam_id]
         connection.request("GET", "%sparam?action=update&Image.I0.Appearance.NightMode=%s" % (self.set_url, state))
-        conn_result = connection.getresponse()
-        print conn_result.status, conn_result.reason
+        self.handleConnResult(connection, client_address, "toggleNightView")
 
 
     def dispatchMessage(self, osc_address, typetags, args, packet, client_address):
         """ dispatches parsed osc messages to the ip cam command methods"""
 
+        print "client_address", client_address
         cam_id = args.pop(0)
         if osc_address == "/moveCam":
-            self.move_cam(cam_id, args)
+            self.move_cam(cam_id, args, client_address)
         elif osc_address == "/setCamPreset":
             self.set_cam_preset(cam_id, args)
         elif osc_address == "/useCamPreset":
@@ -125,12 +162,49 @@ class OSC2CamServer(SimpleOSCServer):
             self.zoom_cam(cam_id, args)
         elif osc_address == "/toggleNightView":
             self.toggle_night_view(cam_id, args)
+        elif osc_address == "/subscribe":
+            self.__subscription_handler(osc_address, typetags, args, packet, client_address)
+
+    def __subscription_handler(self, addr, typetags, args, client_address):
+        """handles a target subscription.
+
+        The provided 'typetags' equals ["s", "i"] and
+        'args' contains [host, portnumber]
+
+        only subscription requests with valid host will be granted.
+        """
+
+        address = args
+        try:
+            r = socket.getaddrinfo(address[0], address[1], socket.AF_INET6, socket.SOCK_DGRAM, 0, socket.AI_V4MAPPED | socket.AI_ALL)
+            print "addrinfo", r
+            if len(r) == 2:
+                address = r[1][4]
+            try:
+                print "%s: subscribe %r (%s:%d) by %s:%d" % (
+                    datetime.now().strftime("%x %X"), args[3], address[0],
+                    address[1], client_address[0], client_address[1])
+                self.targets[tuple(address)] =  args[3]
+            except IndexError:
+                self.targets[tuple(address)] =  ""
+                print "%s: subscribe (%s:%d) by %s:%d" % (
+                    datetime.now().strftime("%x %X"), address[0], address[1],
+                    client_address[0], client_address[1])
+        except socket.error, error:
+            print error
+            print "subscription attempt from %r: host %r not usable" % (
+                client_address, address[0])
+
 
 
 def main():
     parser = argparse.ArgumentParser(prog='osc2cam')
     parser.add_argument('-p', "--port", required=True,
         type=int, help='my port')
+    parser.add_argument('-C', "--client_port", required=True,
+        type=int, help='client port to send reponse to')
+    parser.add_argument('-c', "--cam-config-file", required=True,
+        type=str, help='txt file for cam configuration, each line should be of the form "host, port"')
 
     args = parser.parse_args(sys.argv[1:])
 
