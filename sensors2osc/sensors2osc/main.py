@@ -2,24 +2,19 @@
 # -*- coding: utf-8 -*-
 
 import argparse
-import ConfigParser
 import os.path
-import random
-import re
 import select
 import serial
 import socket
 import sys
-import time
-import struct
 import datetime
 
 
 try:
-    from chaosc.c_osc_lib import *
+    from chaosc.c_osc_lib import OSCMessage
 except ImportError as e:
     print(e)
-    from chaosc.osc_lib import *
+    from chaosc.osc_lib import OSCMessage
 
 
 class Forwarder(object):
@@ -33,18 +28,11 @@ class Forwarder(object):
         self.serial.timeout = 0
         self.buf_ser2osc = ""
 
-        #try:
         self.serial.open()
-        #self.serial.setRTS(False)
-        self.alive = True
-        #except Exception, e:
-            #print "opening", e
-            #self.serial.close()
 
     def close(self):
         """Close all resources and unpublish service"""
         print "%s: closing..." % (self.device, )
-        self.alive = False
         self.serial.close()
 
 
@@ -52,7 +40,7 @@ class EHealth2OSC(Forwarder):
     def __init__(self, actor, platform, device):
         super(EHealth2OSC, self).__init__(actor, platform, device)
 
-    def handleRead(self, osc_sock):
+    def handle_read(self, osc_sock):
         data = self.serial.readline()[:-2]
         print repr(data)
         try:
@@ -84,7 +72,7 @@ class EKG2OSC(Forwarder):
     def __init__(self, actor, platform, device):
         super(EKG2OSC, self).__init__(actor, platform, device)
 
-    def handleRead(self, osc_sock):
+    def handle_read(self, osc_sock):
         t = ord(self.serial.read(1))
         osc_message = OSCMessage("/%s/ekg" % self.actor)
         osc_message.appendTypedArg(t, "i")
@@ -92,57 +80,62 @@ class EKG2OSC(Forwarder):
 
 
 
+class RingBuffer(object):
+    def __init__(self, length):
+        self.length = length
+        self.ring_buf = [-1 for i in xrange(length)]
+        self.head = 0
+
+    def append(self, value):
+        self.ring_buf[self.head] = value
+        self.head = (self.head + 1) % self.length
+
+    def getData(self):
+        print "getData", self.ring_buf, self.head
+        data = list()
+        for i in range(7, 1, -1):
+            value = self.ring_buf[(self.head - i) % self.length]
+            if value == -1:
+                raise ValueError("not complete")
+            data.append(value)
+        if data[0] != 0x0 and data[1] != 0xff:
+            raise ValueError("not synced")
+        return data[2:]
+
+
+
 class Pulse2OSC(Forwarder):
     def __init__(self, actor, platform, device):
         super(Pulse2OSC, self).__init__(actor, platform, device)
-        self.buf = [0 for i in xrange(24)]
-        self.position = 0
-        self.start = -1
+        self.buf = RingBuffer(6)
         self.heartbeat_send = False
 
-    def handleRead(self, osc_sock):
+    def handle_read(self, osc_sock):
         t = ord(self.serial.read(1))
-        pos = (self.position + 1) % 24
-        self.buf[pos] = t
-        self.position = pos
+        self.buf.append(t)
+
         if t == 0:
-            self.start = pos
+            try:
+                heart_signal, heart_rate, o2, pulse = self.buf.getData()
 
-        #print "start", self.start
-        if self.start > -1:
-            data = range(6)
-            for i in range(6):
-                data[i] = self.buf[(self.start + i) % 24]
-
-            sync1, sync2, heart_signal, heart_rate, o2, pulse = data
-
-            #print sync1, sync2, heart_signal, heart_rate, o2, pulse
-            if pulse == 245 and not self.heartbeat_send:
-                osc_message = OSCMessage("/%s/heartbeat" % self.actor)
-                osc_message.appendTypedArg(1, "i")
-                osc_message.appendTypedArg(heart_rate, "i")
-                osc_message.appendTypedArg(o2, "i")
-                osc_sock.sendall(osc_message.encode_osc())
-                print "heartbeat", datetime.datetime.now(), heart_signal
-                self.heartbeat_send = True
-            elif pulse == 1 and self.heartbeat_send:
-                #print "off heartbeat", datetime.datetime.now(), heart_signal
-                self.heartbeat_send = False
-                osc_message = OSCMessage("/%s/heartbeat" % self.actor)
-                osc_message.appendTypedArg(0, "i")
-                osc_message.appendTypedArg(heart_rate, "i")
-                osc_message.appendTypedArg(o2, "i")
-                osc_sock.sendall(osc_message.encode_osc())
-
-            #osc_message = OSCMessage("/%s/o2" % self.actor)
-            #osc_message.appendTypedArg(o2, "i")
-            #osc_sock.sendall(osc_message.encode_osc())
-
-            #osc_message = OSCMessage("/%s/heartrate" % self.actor)
-            #osc_message.appendTypedArg(heart_rate, "i")
-            #osc_sock.sendall(osc_message.encode_osc())
-            self.start = -1
-
+                if pulse == 245 and not self.heartbeat_send:
+                    osc_message = OSCMessage("/%s/heartbeat" % self.actor)
+                    osc_message.appendTypedArg(1, "i")
+                    osc_message.appendTypedArg(heart_rate, "i")
+                    osc_message.appendTypedArg(o2, "i")
+                    osc_sock.sendall(osc_message.encode_osc())
+                    print "heartbeat", datetime.datetime.now(), heart_signal
+                    self.heartbeat_send = True
+                elif pulse == 1 and self.heartbeat_send:
+                    #print "off heartbeat", datetime.datetime.now(), heart_signal
+                    self.heartbeat_send = False
+                    osc_message = OSCMessage("/%s/heartbeat" % self.actor)
+                    osc_message.appendTypedArg(0, "i")
+                    osc_message.appendTypedArg(heart_rate, "i")
+                    osc_message.appendTypedArg(o2, "i")
+                    osc_sock.sendall(osc_message.encode_osc())
+            except ValueError, e:
+                print e
 
 
 
@@ -156,7 +149,6 @@ def main():
 
     args = parser.parse_args(sys.argv[1:])
 
-    connections = list()
     osc_sock = socket.socket(2, 2, 17)
     osc_sock.connect((args.chaosc_host, args.chaosc_port))
 
@@ -199,14 +191,14 @@ def main():
                         raise ValueError("unknown description %r for device %r" % (description, device))
             else:
                 print "device missing", device
-                m = OSCMessage("/DeviceMissing")
-                m.appendTypedArg(description[0], "s")
-                m.appendTypedArg(description[1], "s")
-                osc_sock.sendall(m.encode_osc())
+                message = OSCMessage("/DeviceMissing")
+                message.appendTypedArg(description[0], "s")
+                message.appendTypedArg(description[1], "s")
+                osc_sock.sendall(message.encode_osc())
 
         read_map = {}
         for forwarder in used_devices.values():
-            read_map[forwarder.serial] = forwarder.handleRead
+            read_map[forwarder.serial] = forwarder.handle_read
 
         readers, writers, errors = select.select(read_map, [], [], 0.1)
         #print "readers", readers
