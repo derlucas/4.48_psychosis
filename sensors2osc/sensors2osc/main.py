@@ -1,6 +1,23 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 
+# This file is part of chaosc
+#
+# chaosc is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# chaosc is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with chaosc.  If not, see <http://www.gnu.org/licenses/>.
+#
+# Copyright (C) 2014 Stefan Kögl
+
 import argparse
 import os.path
 import select
@@ -8,7 +25,6 @@ import serial
 import socket
 import sys
 import datetime
-
 
 try:
     from chaosc.c_osc_lib import OSCMessage
@@ -64,10 +80,6 @@ class EHealth2OSC(Forwarder):
         osc_sock.sendall(osc_message.encode_osc())
 
 
-
-
-
-
 class EKG2OSC(Forwarder):
     def __init__(self, actor, platform, device):
         super(EKG2OSC, self).__init__(actor, platform, device)
@@ -77,7 +89,6 @@ class EKG2OSC(Forwarder):
         osc_message = OSCMessage("/%s/ekg" % self.actor)
         osc_message.appendTypedArg(t, "i")
         osc_sock.sendall(osc_message.encode_osc())
-
 
 
 class RingBuffer(object):
@@ -98,7 +109,7 @@ class RingBuffer(object):
             if value == -1:
                 raise ValueError("not complete")
             data.append(value)
-        if data[0] != 0x0 and data[1] != 0xff:
+        if data[0] != 0x0 or data[1] != 0xff:
             raise ValueError("not synced")
         return data[2:]
 
@@ -108,7 +119,7 @@ class Pulse2OSC(Forwarder):
     def __init__(self, actor, platform, device):
         super(Pulse2OSC, self).__init__(actor, platform, device)
         self.buf = RingBuffer(6)
-        self.heartbeat_send = False
+        self.heartbeat_on = False
 
     def handle_read(self, osc_sock):
         t = ord(self.serial.read(1))
@@ -118,17 +129,17 @@ class Pulse2OSC(Forwarder):
             try:
                 heart_signal, heart_rate, o2, pulse = self.buf.getData()
 
-                if pulse == 245 and not self.heartbeat_send:
+                if pulse == 245 and not self.heartbeat_on:
                     osc_message = OSCMessage("/%s/heartbeat" % self.actor)
                     osc_message.appendTypedArg(1, "i")
                     osc_message.appendTypedArg(heart_rate, "i")
                     osc_message.appendTypedArg(o2, "i")
                     osc_sock.sendall(osc_message.encode_osc())
                     print "heartbeat", datetime.datetime.now(), heart_signal
-                    self.heartbeat_send = True
-                elif pulse == 1 and self.heartbeat_send:
+                    self.heartbeat_on = True
+                elif pulse == 1 and self.heartbeat_on:
                     #print "off heartbeat", datetime.datetime.now(), heart_signal
-                    self.heartbeat_send = False
+                    self.heartbeat_on = False
                     osc_message = OSCMessage("/%s/heartbeat" % self.actor)
                     osc_message.appendTypedArg(0, "i")
                     osc_message.appendTypedArg(heart_rate, "i")
@@ -138,7 +149,6 @@ class Pulse2OSC(Forwarder):
                 print e
 
 
-
 def main():
     parser = argparse.ArgumentParser(prog='psychose_actor')
     parser.add_argument("-H", '--chaosc_host', required=True,
@@ -146,30 +156,22 @@ def main():
     parser.add_argument("-p", '--chaosc_port', required=True,
         type=int, help='port of chaosc instance to control')
 
-
     args = parser.parse_args(sys.argv[1:])
 
     osc_sock = socket.socket(2, 2, 17)
     osc_sock.connect((args.chaosc_host, args.chaosc_port))
 
-
     naming = {
-        "/dev/ttyUSB0" : ["merle", "ehealth"],
-        "/dev/ttyUSB1" : ["merle", "ekg"],
-        "/dev/ttyUSB2" : ["merle", "pulse"],
-        "/dev/ttyUSB3" : ["bjoern", "ehealth"],
-        "/dev/ttyUSB4" : ["bjoern", "ekg"],
-        "/dev/ttyUSB5" : ["bjoern", "pulse"],
-        "/dev/ttyUSB6" : ["uwe", "ehealth"],
-        "/dev/ttyUSB7" : ["uwe", "ekg"],
-        "/dev/ttyUSB8" : ["uwe", "pulse"]
-        }
-
-    naming = {
-        #"/dev/ttyACM0" : ["merle", "pulse"],
-        "/dev/ttyUSB0" : ["merle", "ehealth"],
-        #"/dev/ttyACM1" : ["merle", "pulse"]
-        }
+        "/dev/ttyUSB0" : ["bjoern", "ehealth"],
+        "/dev/ttyACM0" : ["bjoern", "ekg"],
+        "/dev/ttyACM1" : ["bjoern", "pulse"],
+        "/dev/ttyUSB1" : ["merle", "ehealth"],
+        "/dev/ttyACM2" : ["merle", "ekg"],
+        "/dev/ttyACM3" : ["merle", "pulse"],
+        "/dev/ttyUSB2" : ["uwe", "ehealth"],
+        "/dev/ttyACM4" : ["uwe", "ekg"],
+        "/dev/ttyACM5" : ["uwe", "pulse"]
+    }
 
     used_devices = dict()
 
@@ -201,6 +203,5 @@ def main():
             read_map[forwarder.serial] = forwarder.handle_read
 
         readers, writers, errors = select.select(read_map, [], [], 0.1)
-        #print "readers", readers
         for reader in readers:
             read_map[reader](osc_sock)
