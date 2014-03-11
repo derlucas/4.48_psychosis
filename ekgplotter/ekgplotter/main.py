@@ -1,3 +1,10 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+
+
+from __future__ import absolute_import
+
+
 import pyqtgraph as pg
 import select
 import socket
@@ -9,7 +16,6 @@ from PyQt4.QtCore import QBuffer, QByteArray, QIODevice
 
 from collections import deque
 
-# -*- coding: utf-8 -*-
 
 """This module implements the standalone filtering tool in the chaosc framework.
 
@@ -40,8 +46,6 @@ transcoding.py file.
 # along with chaosc.  If not, see <http://www.gnu.org/licenses/>.
 #
 # Copyright (C) 2012-2014 Stefan Kögl
-
-from __future__ import absolute_import
 
 
 import atexit
