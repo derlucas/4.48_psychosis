@@ -4,7 +4,6 @@
 from distribute_setup import use_setuptools
 use_setuptools()
 
-from scripts.version import get_git_version
 import sys
 from setuptools import find_packages, setup
 
@@ -33,6 +32,7 @@ setup(
     entry_points = """
     [console_scripts]
     sensors2osc = sensors2osc.main:main
+    sensorTest = sensors2osc.sensorTest:main
     """,
     # pypi metadata
     author = "Stefan Kögl",
