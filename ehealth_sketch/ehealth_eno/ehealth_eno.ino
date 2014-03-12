@@ -24,30 +24,30 @@ float getTemperature(void)
     float aux=(voltage2/RefTension)+Rb/(Rb+Ra);
     Resistance=Rc*aux/(1-aux);
     if (Resistance >=1822.8) {
-            // if temperature between 25ºC and 29.9ºC. R(tª)=6638.20457*(0.95768)^t
-            Temperature=log(Resistance/6638.20457)/log(0.95768);
+        // if temperature between 25ºC and 29.9ºC. R(tª)=6638.20457*(0.95768)^t
+        Temperature=log(Resistance/6638.20457)/log(0.95768);
     } else {
-            if (Resistance >=1477.1){
-                            // if temperature between 30ºC and 34.9ºC. R(tª)=6403.49306*(0.95883)^t
-                            Temperature=log(Resistance/6403.49306)/log(0.95883);
-            } else {
-                    if (Resistance >=1204.8){
-                            // if temperature between 35ºC and 39.9ºC. R(tª)=6118.01620*(0.96008)^t
-                            Temperature=log(Resistance/6118.01620)/log(0.96008);
-                    }
-                    else{
-                            if (Resistance >=988.1){
-                                    // if temperature between 40ºC and 44.9ºC. R(tª)=5859.06368*(0.96112)^t
-                                    Temperature=log(Resistance/5859.06368)/log(0.96112);
-                            }
-                            else {
-                                    if (Resistance >=811.7){
-                                            // if temperature between 45ºC and 50ºC. R(tª)=5575.94572*(0.96218)^t
-                                            Temperature=log(Resistance/5575.94572)/log(0.96218);
-                                    }
-                            }
-                    }
-            }
+        if (Resistance >=1477.1){
+                        // if temperature between 30ºC and 34.9ºC. R(tª)=6403.49306*(0.95883)^t
+                        Temperature=log(Resistance/6403.49306)/log(0.95883);
+        } else {
+                if (Resistance >=1204.8){
+                        // if temperature between 35ºC and 39.9ºC. R(tª)=6118.01620*(0.96008)^t
+                        Temperature=log(Resistance/6118.01620)/log(0.96008);
+                }
+                else{
+                        if (Resistance >=988.1){
+                                // if temperature between 40ºC and 44.9ºC. R(tª)=5859.06368*(0.96112)^t
+                                Temperature=log(Resistance/5859.06368)/log(0.96112);
+                        }
+                        else {
+                                if (Resistance >=811.7){
+                                        // if temperature between 45ºC and 50ºC. R(tª)=5575.94572*(0.96218)^t
+                                        Temperature=log(Resistance/5575.94572)/log(0.96218);
+                                }
+                        }
+                }
+        }
     }
 
     return Temperature;
