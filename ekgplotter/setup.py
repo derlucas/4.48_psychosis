@@ -11,7 +11,7 @@ if sys.version_info >= (3,):
     extras['use_2to3'] = True
 
 setup(
-    name='sensors2osc',
+    name='ekgplotter',
     version="0.1",
     packages=find_packages(exclude=["scripts",]),
 
@@ -22,8 +22,7 @@ setup(
 
     exclude_package_data = {'': ['.gitignore']},
 
-    install_requires=[
-        "pyserial",],
+    install_requires=[],
 
     # installing unzipped
     zip_safe = False,
@@ -31,8 +30,7 @@ setup(
     # predefined extension points, e.g. for plugins
     entry_points = """
     [console_scripts]
-    sensors2osc = sensors2osc.main:main
-    sensorTest = sensors2osc.sensorTest:main
+    ekgplotter = ekgplotter.main:main
     """,
     # pypi metadata
     author = "Stefan Kögl",
