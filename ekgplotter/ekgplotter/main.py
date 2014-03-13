@@ -1,151 +1,169 @@
-#!/usr/bin/python
-# -*- coding: utf-8 -*-
-
-
-from __future__ import absolute_import
-
-
-import pyqtgraph as pg
+import numpy as np
+import string,cgi,time, random, socket
+from os import curdir, sep
+from BaseHTTPServer import BaseHTTPRequestHandler, HTTPServer
+from SocketServer import ThreadingMixIn, ForkingMixIn
 import select
-import socket
-import cStringIO
-import subprocess
-import threading
-import time
-from PyQt4.QtCore import QBuffer, QByteArray, QIODevice
+import re
 
 from collections import deque
 
+from PyQt4.QtCore import QBuffer, QByteArray, QIODevice
+from PyQt4 import QtGui
+import pyqtgraph as pg
 
-"""This module implements the standalone filtering tool in the chaosc framework.
-
-It uses the chaosc osc_lib but does not depend on chaosc features, so it can
-be used with other osc compatible gear.
-
-We provide here osc message filtering based on python regex defined in a file
-and a very flexible transcoding toolchain, but it's up to your python skills
-to master them. The TranscoderBaseHandler subclasses should be defined in the
-appropriate python module you place in the config directory. Please refer for
-a howto/examples to our comprehensive docs or look into the provided example
-transcoding.py file.
-"""
-
-# This file is part of chaosc
-#
-# chaosc is free software: you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
-#
-# chaosc is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with chaosc.  If not, see <http://www.gnu.org/licenses/>.
-#
-# Copyright (C) 2012-2014 Stefan Kögl
+from pyqtgraph.widgets.PlotWidget import PlotWidget
 
 
-import atexit
-import sys, argparse
+try:
+    from chaosc.c_osc_lib import decode_osc
+except ImportError as e:
+    print(e)
+    from chaosc.osc_lib import decode_osc
 
-from datetime import datetime
-from chaosc.simpleOSCServer import SimpleOSCServer
-import chaosc._version
+QAPP = None
 
-
-class ChaoscLogger(SimpleOSCServer):
-    """OSC filtering/transcoding middleware
-    """
-
-    def __init__(self, args):
-        """ctor for filter server
-
-        starts the server, loads scene filters and transcoders and chooses
-        the request handler, which is one of
-        forward only, forward and dump, dump only.
-
-        :param result: return value of argparse.parse_args
-        :type result: namespace object
-        """
-
-        d = datetime.now().strftime("%x %X")
-        print "%s: starting up chaosc_dump-%s..." % (d, chaosc._version.__version__)
-        SimpleOSCServer.__init__(self, (args.own_host, args.own_port))
-        self.args = args
-        self.chaosc_address = (args.chaosc_host, args.chaosc_port)
-
-        if args.subscribe:
-            self.subscribe_me(self.chaosc_address, (args.own_host, args.own_port),
-                args.token, args.subscriber_label)
-
-        self.plot_data = deque([0] * 100)
-        self.plt = pg.plot()
+def mkQApp():
+    if QtGui.QApplication.instance() is None:
+        global QAPP
+        QAPP = QtGui.QApplication([])
 
 
-    def dispatchMessage(self, osc_address, typetags, args, packet,
-        client_address):
-        """Handles this filtering, transcoding steps and forwards the result
-
-        :param osc_address: the OSC address string.
-        :type osc_address: str
-
-        :param typetags: the typetags of args
-        :type typetags: list
-
-        :param args: the osc message args
-        :type args: list
-
-        :param packet: the binary representation of a osc message
-        :type packet: str
-
-        :param client_address: (host, port) of the requesting client
-        :type client_address: tuple
-        """
+class PlotWindow(PlotWidget):
+    def __init__(self, title=None, **kargs):
+        mkQApp()
+        self.win = QtGui.QMainWindow()
+        PlotWidget.__init__(self, **kargs)
+        self.win.setCentralWidget(self)
+        for m in ['resize']:
+            setattr(self, m, getattr(self.win, m))
+        if title is not None:
+            self.win.setWindowTitle(title)
 
 
-        if osc_address == "/uwe/ekg":
-            self.plot_data.appendleft(args[0])
-            self.plot_data.pop()
-            self.plt.plot(self.plot_data, clear=True)
-            exporter = pg.exporters.ImageExporter.ImageExporter(self.plt.plotItem)
-            exporter.parameters()['width'] = 1024
-            name = '/tmp/plotImage.jpg'
-            exporter.export(name)
+class MyHandler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        print "get"
+        global plotValues
+        try:
+            self.path=re.sub('[^.a-zA-Z0-9]', "",str(self.path))
+            if self.path=="" or self.path==None or self.path[:1]==".":
+                return
+            if self.path.endswith(".html"):
+                f = open(curdir + sep + self.path)
+                self.send_response(200)
+                self.send_header('Content-type',    'text/html')
+                self.end_headers()
+                self.wfile.write(f.read())
+                f.close()
+                return
+            if self.path.endswith(".mjpeg"):
+                self.send_response(200)
+
+                plot_data1 = deque([0] * 100)
+                plot_data2 = deque([254/3] * 100)
+                plot_data3 = deque([254/3*2] * 100)
+                plt = PlotWindow(title="EKG", name="Merle")
+                plt.addLegend()
+                #plt = pg.plot(pen=(0, 3*1.3))
+                plt.resize(1280, 720)
+                plotItem1 = pg.PlotCurveItem(pen=(0, 3*1.3), name="bjoern")
+                plotItem2 = pg.PlotCurveItem(pen=(1, 3*1.3), name="merle")
+                plotItem3 = pg.PlotCurveItem(pen=(2, 3*1.3), name="uwe")
+                plotItem1.setPos(0, 0*6)
+                plotItem2.setPos(0, 1*6)
+                plotItem3.setPos(0, 2*6)
+                plt.addItem(plotItem1)
+                plt.addItem(plotItem2)
+                plt.addItem(plotItem3)
+
+                plt.setLabel('left', "EKG")
+                plt.setLabel('bottom', "Time")
+                plt.showGrid(True, True)
+                ba = plt.getAxis("bottom")
+                bl = plt.getAxis("left")
+                ba.setTicks([])
+                bl.setTicks([])
+                plt.setYRange(0, 254)
+                print type(plt)
+                self.wfile.write("Content-Type: multipart/x-mixed-replace; boundary=--aaboundary")
+                self.wfile.write("\r\n\r\n")
+                osc_sock = socket.socket(2, 2, 17)
+                osc_sock.bind(("", 10000))
+                osc_sock.setblocking(0)
+                last = time.time()
+                now = last
+
+                while 1:
+                    for i in xrange(3):
+                        reads, writes, errs = select.select([osc_sock], [], [], 0.01)
+                        #print reads, writes, errs
+                        if reads:
+                            osc_input = reads[0].recv(4096)
+                            osc_address, typetags, args = decode_osc(osc_input, 0, len(osc_input))
+                            #print "osc", osc_address, typetags, args
+                            if osc_address.startswith("/bjoern"):
+                                plot_data1.appendleft(args[0] / 3)
+                                plot_data1.pop()
+                            elif osc_address.startswith("/merle"):
+                                plot_data2.appendleft(args[0] / 3 + 254/3)
+                                plot_data2.pop()
+                            elif osc_address.startswith("/uwe"):
+                                plot_data3.appendleft(args[0] / 3 + 254/3*2)
+                                plot_data3.pop()
+
+                    plotItem1.setData(y=np.array(plot_data1), clear=True)
+                    plotItem2.setData(y=np.array(plot_data2), clear=True)
+                    plotItem3.setData(y=np.array(plot_data3), clear=True)
+                    #item = plt.plot(plot_data1, pen=(0, 3*1.3), clear=True)
+
+                    exporter = pg.exporters.ImageExporter.ImageExporter(plt.plotItem)
+                    exporter.parameters()['width'] = 1280
+                    #exporter.parameters()['height'] = 720
+                    name = 'tmpfile'
+                    img = exporter.export(name, True)
+                    buffer = QBuffer()
+                    buffer.open(QIODevice.ReadWrite)
+                    img.save(buffer, "JPG", 100)
+                    JpegData = buffer.data()
+                    self.wfile.write("--aaboundary\r\n")
+                    self.wfile.write("Content-Type: image/jpeg\r\n")
+                    self.wfile.write("Content-length: %d\r\n\r\n" % len(JpegData))
+                    self.wfile.write(JpegData)
+                    self.wfile.write("\r\n\r\n\r\n")
+                    now = time.time()
+                    dur = now - last
+                    print dur
+                    wait = 0.04 - dur
+                    if wait > 0:
+                        time.sleep(wait)
+                    last = now
+                return
+            if self.path.endswith(".jpeg"):
+                f = open(curdir + sep + self.path)
+                self.send_response(200)
+                self.send_header('Content-type','image/jpeg')
+                self.end_headers()
+                self.wfile.write(f.read())
+                f.close()
+                return
+            return
+        except IOError:
+            self.send_error(404,'File Not Found: %s' % self.path)
 
 
-
-    def unsubscribe(self):
-        self.unsubscribe_me(self.chaosc_address, (self.args.own_host, self.args.own_port),
-            self.args.token)
-
-
+#class ThreadedHTTPServer(ThreadingMixIn, HTTPServer):
+class ThreadedHTTPServer(HTTPServer, ForkingMixIn):
+    """Handle requests in a separate thread."""
 
 def main():
-    parser = argparse.ArgumentParser(prog='ekgplotter')
-    main_args_group = parser.add_argument_group('main flags', 'flags for chaosc_transcoder')
-    chaosc_args_group = parser.add_argument_group('chaosc', 'flags relevant for interacting with chaosc')
+    try:
+        server = ThreadedHTTPServer(('0.0.0.0', 9000), MyHandler)
+        print 'started httpserver...'
+        server.serve_forever()
+    except KeyboardInterrupt:
+        print '^C received, shutting down server'
+        server.socket.close()
 
-    main_args_group.add_argument('-o', "--own_host", required=True,
-        type=str, help='my host')
-    main_args_group.add_argument('-p', "--own_port", required=True,
-        type=int, help='my port')
-
-    chaosc_args_group.add_argument('-s', '--subscribe', action="store_true",
-        help='if True, this transcoder subscribes itself to chaosc. If you use this, you need to provide more flags in this group')
-    chaosc_args_group.add_argument('-S', '--subscriber_label', type=str, default="chaosc_transcoder",
-        help='the string to use for subscription label, default="chaosc_transcoder"')
-    chaosc_args_group.add_argument('-t', '--token', type=str, default="sekret",
-        help='token to authorize subscription command, default="sekret"')
-    chaosc_args_group.add_argument("-H", '--chaosc_host',
-        type=str, help='host of chaosc instance')
-    chaosc_args_group.add_argument("-P", '--chaosc_port',
-        type=int, help='port of chaosc instance')
-
-    server = ChaoscLogger(parser.parse_args(sys.argv[1:]))
-
-    atexit.register(server.unsubscribe)
-    server.serve_forever()
-
+if __name__ == '__main__':
+    main()
