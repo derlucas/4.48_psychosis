@@ -20,12 +20,14 @@
 
 from __future__ import absolute_import
 
+import atexit
+import socket
 from sensors2osc import common
 
-atexit.register(close)
+atexit.register(common.close)
 
 def main():
-    args, osc_sock = init("ekg2osc")
+    args, osc_sock = common.init("ekg2osc")
 
     actor = args.actor
 
@@ -39,7 +41,7 @@ def main():
         except socket.error, msg:
             # got disconnected?
             print "lost connection!!!"
-            reconnect(args)
+            common.reconnect(args)
 
 
 
