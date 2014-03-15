@@ -22,6 +22,7 @@ from __future__ import absolute_import
 
 from sensors2osc.common import *
 
+atexit.register(close)
 
 def main():
     args, osc_sock = init("ekg2osc")
@@ -43,5 +44,4 @@ def main():
 
 
 if __name__ == '__main__':
-    atexit.register(close)
     main()

@@ -22,6 +22,8 @@ from __future__ import absolute_import
 
 from sensors2osc.common import *
 
+atexit.register(close)
+
 class RingBuffer(object):
     def __init__(self, length):
         self.length = length
@@ -98,5 +100,4 @@ def main():
 
 
 if __name__ == '__main__':
-    atexit.register(close)
     main()

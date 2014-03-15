@@ -33,6 +33,9 @@ setup(
     [console_scripts]
     sensors2osc = sensors2osc.main:main
     sensorTest = sensors2osc.sensorTest:main
+    ekg2osc = sensors2osc.ekg2osc:main
+    pulse2osc = sensors2osc.pulse2osc:main
+    ehealth2osc = sensors2osc.ehealth2osc:main
     """,
     # pypi metadata
     author = "Stefan Kögl",
