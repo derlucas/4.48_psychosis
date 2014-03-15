@@ -22,7 +22,7 @@ setup(
 
     exclude_package_data = {'': ['.gitignore']},
 
-    install_requires=[],
+    install_requires=["pyqtgraph"],
 
     # installing unzipped
     zip_safe = False,
