@@ -68,19 +68,7 @@ def create_args(name):
     add_chaosc_group(arg_parser)
 
     args = finalize_arg_parser(arg_parser)
-
-
-    while 1:
-        try:
-            t = ord(serial_sock.read(1))
-            print "got value", t
-            osc_message = OSCMessage("/%s/ekg" % actor)
-            osc_message.appendTypedArg(t, "i")
-            osc_sock.sendall(osc_message.encode_osc())
-        except socket.error, msg:
-            # got disconnected?
-            print "lost connection!!!"
-            reconnect(args)
+    return args
 
 def init(name):
     args = create_args(name)
