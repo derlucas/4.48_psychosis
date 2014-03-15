@@ -20,7 +20,7 @@
 
 from __future__ import absolute_import
 
-from sensors2osc.common import *
+from sensors2osc import common
 
 atexit.register(close)
 
@@ -31,7 +31,7 @@ def main():
 
     while 1:
         try:
-            t = ord(serial_sock.read(1))
+            t = ord(common.serial_sock.read(1))
             print "got value", t
             osc_message = OSCMessage("/%s/ekg" % actor)
             osc_message.appendTypedArg(t, "i")
