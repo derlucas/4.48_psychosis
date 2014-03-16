@@ -22,49 +22,72 @@ from __future__ import absolute_import
 
 from sensors2osc.common import *
 
-atexit.register(close)
+
 
 def main():
-    args, osc_sock = init("ehealth2osc")
+    platform = init("ehealth2osc")
 
-    actor = args.actor
+    actor = platform.args.actor
 
     while 1:
         try:
-            data = serial_sock.readline()[:-2]
-            print "got data", repr(data)
-            try:
-                airFlow, emg, temp = data.split(";")
-            except ValueError:
-                continue
-
-            try:
-                airFlow = int(airFlow)
-                osc_message = OSCMessage("/%s/airFlow" % actor)
-                osc_message.appendTypedArg(airFlow, "i")
-                osc_sock.sendall(osc_message.encode_osc())
-            except ValueError:
-                pass
-
-            try:
-                emg = int(emg)
-                osc_message = OSCMessage("/%s/emg" % actor)
-                osc_message.appendTypedArg(emg, "i")
-                osc_sock.sendall(osc_message.encode_osc())
-            except ValueError:
-                pass
-
-            try:
-                temp = int(temp)
-                osc_message = OSCMessage("/%s/temperatur" % actor)
-                osc_message.appendTypedArg(temp, "i")
-                osc_sock.sendall(osc_message.encode_osc())
-            except ValueError:
-                pass
+            data = platform.serial_sock.readline()[:-2]
+            print repr(data)
         except socket.error, msg:
             # got disconnected?
-            print "lost connection!!!"
-            reconnect(args)
+            print "serial socket error!!!", msg
+            platform.reconnect()
+
+        print "got data", repr(data)
+        try:
+            airFlow, emg, temp = data.split(";")
+        except ValueError, e:
+            print e
+            continue
+
+        try:
+            airFlow = int(airFlow)
+        except ValueError, e:
+            print e
+            continue
+
+        try:
+            osc_message = OSCMessage("/%s/airFlow" % actor)
+            osc_message.appendTypedArg(airFlow, "i")
+            platform.osc_sock.sendall(osc_message.encode_osc())
+        except socket.error, msg:
+            print "cannot connect to chaosc", msg
+            continue
+
+
+        try:
+            emg = int(emg)
+        except ValueError, e:
+            print e
+            continue
+
+        try:
+            osc_message = OSCMessage("/%s/emg" % actor)
+            osc_message.appendTypedArg(emg, "i")
+            platform.osc_sock.sendall(osc_message.encode_osc())
+        except socket.error, msg:
+            print "cannot connect to chaosc", msg
+            continue
+
+
+        try:
+            temp = int(temp)
+        except ValueError, e:
+            print e
+            continue
+
+        try:
+            osc_message = OSCMessage("/%s/temperatur" % actor)
+            osc_message.appendTypedArg(temp, "i")
+            platform.osc_sock.sendall(osc_message.encode_osc())
+        except socket.error, msg:
+            print "cannot connect to chaosc", msg
+            continue
 
 
 
