@@ -20,6 +20,8 @@
 
 from __future__ import absolute_import
 
+import time
+
 from sensors2osc.common import *
 
 
@@ -50,6 +52,7 @@ def main():
         except socket.error, msg:
             print "cannot connect to chaosc"
             continue
+        time.sleep(0.1)
 
 
 if __name__ == '__main__':

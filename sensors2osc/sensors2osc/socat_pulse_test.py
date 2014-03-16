@@ -23,19 +23,14 @@
 
 from __future__ import absolute_import
 
-import time, random
+import serial, time, random, sys, random, struct
 
-import serial
-
-serial_sock = serial.Serial()
 
 serial_sock = serial.Serial()
-serial_sock.port = "/tmp/pty2"
+serial_sock.port = sys.argv[1]
 serial_sock.baudrate = 115200
 serial_sock.timeout = 0
 serial_sock.open()
-import time, random, struct
-
 
 
 class DataGenenerator(object):
@@ -64,4 +59,4 @@ r = DataGenenerator()
 
 while 1:
     serial_sock.write(struct.pack("B", r.read()))
-    time.sleep(0.5)
+    time.sleep(0.1)

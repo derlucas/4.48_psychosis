@@ -21,7 +21,7 @@
 from __future__ import absolute_import
 
 from sensors2osc.common import *
-
+import time
 
 
 def main():
@@ -32,13 +32,13 @@ def main():
     while 1:
         try:
             data = platform.serial_sock.readline()[:-2]
-            print repr(data)
+            #print repr(data)
         except socket.error, msg:
             # got disconnected?
             print "serial socket error!!!", msg
             platform.reconnect()
 
-        print "got data", repr(data)
+        #print "got data", repr(data)
         try:
             airFlow, emg, temp = data.split(";")
         except ValueError, e:
@@ -88,6 +88,7 @@ def main():
         except socket.error, msg:
             print "cannot connect to chaosc", msg
             continue
+        time.sleep(0.1)
 
 
 

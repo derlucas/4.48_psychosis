@@ -21,17 +21,15 @@
 # used this line before opening that script
 # socat -d -d PTY,raw,echo=0,link=/tmp/pty1,b115200,user=stefan PTY,raw,echo=0,link=/tmp/pty2,b115200,user=stefan
 
-import serial
+import serial, sys, time, random, struct
 
 serial_sock = serial.Serial()
-
-serial_sock = serial.Serial()
-serial_sock.port = "/tmp/pty2"
+serial_sock.port = sys.argv[1]
 serial_sock.baudrate = 115200
 serial_sock.timeout = 0
 serial_sock.open()
-import time, random, struct
+
 
 while 1:
     serial_sock.write("%d;%d;%d\r\n" % (random.randint(0,1023), random.randint(0,1023), random.randint(0,1023)))
-    #time.sleep(.5)
+    time.sleep(0.1)

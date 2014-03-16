@@ -41,8 +41,8 @@ setup(
     author = "Stefan Kögl",
 
     # FIXME: add author email
-    author_email = "",
-    description = "osc filtering application level gateway",
+    author_email = "hotte@ctdo.de",
+    description = "tools for sending osc messages from olimex and ehealth biofeedback platforms to OSC",
 
     # FIXME: add long_description
     long_description = """
