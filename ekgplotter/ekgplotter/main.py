@@ -24,6 +24,7 @@
 
 from __future__ import absolute_import
 
+from  datetime import datetime
 import threading
 import Queue
 import numpy as np
@@ -44,7 +45,12 @@ from pyqtgraph.widgets.PlotWidget import PlotWidget
 
 from chaosc.argparser_groups import *
 
-QtGui.QApplication.setGraphicsSystem('raster')
+try:
+    from chaosc.c_osc_lib import *
+except ImportError:
+    from chaosc.osc_lib import *
+
+QtGui.QApplication.setGraphicsSystem('opengl')
 
 
 try:
@@ -70,10 +76,53 @@ class PlotWindow(PlotWidget):
 class OSCThread(threading.Thread):
     def __init__(self, args):
         super(OSCThread, self).__init__()
+        self.args = args
         self.running = True
+        self.own_address = socket.getaddrinfo(args.own_host, args.own_port, socket.AF_INET6, socket.SOCK_DGRAM, 0, socket.AI_V4MAPPED | socket.AI_ALL | socket.AI_CANONNAME)[-1][4][:2]
+
+        self.chaosc_address = chaosc_host, chaosc_port = socket.getaddrinfo(args.chaosc_host, args.chaosc_port, socket.AF_INET6, socket.SOCK_DGRAM, 0, socket.AI_V4MAPPED | socket.AI_ALL | socket.AI_CANONNAME)[-1][4][:2]
+
         self.osc_sock = socket.socket(2, 2, 17)
-        self.osc_sock.bind((args.own_host, args.own_port))
+        self.osc_sock.bind(self.own_address)
         self.osc_sock.setblocking(0)
+
+        print "%s: starting up osc receiver on '%s:%d'" % (
+            datetime.now().strftime("%x %X"), self.own_address[0], self.own_address[1])
+
+        self.subscribe_me()
+
+    def subscribe_me(self):
+        """Use this procedure for a quick'n dirty subscription to your chaosc instance.
+
+        :param chaosc_address: (chaosc_host, chaosc_port)
+        :type chaosc_address: tuple
+
+        :param receiver_address: (host, port)
+        :type receiver_address: tuple
+
+        :param token: token to get authorized for subscription
+        :type token: str
+        """
+        print "%s: subscribing to '%s:%d' with label %r" % (datetime.now().strftime("%x %X"), self.chaosc_address[0], self.chaosc_address[1], self.args.subscriber_label)
+        msg = OSCMessage("/subscribe")
+        msg.appendTypedArg(self.own_address[0], "s")
+        msg.appendTypedArg(self.own_address[1], "i")
+        msg.appendTypedArg(self.args.authenticate, "s")
+        if self.args.subscriber_label is not None:
+            msg.appendTypedArg(self.args.subscriber_label, "s")
+        self.osc_sock.sendto(msg.encode_osc(), self.chaosc_address)
+
+
+    def unsubscribe_me(self):
+        if self.args.keep_subscribed:
+            return
+
+        print "%s: unsubscribing from '%s:%d'" % (datetime.now().strftime("%x %X"), self.chaosc_address[0], self.chaosc_address[1])
+        msg = OSCMessage("/unsubscribe")
+        msg.appendTypedArg(self.own_address[0], "s")
+        msg.appendTypedArg(self.own_address[1], "i")
+        msg.appendTypedArg(self.args.authenticate, "s")
+        self.osc_sock.sendto(msg.encode_osc(), self.chaosc_address)
 
     def run(self):
 
@@ -88,6 +137,7 @@ class OSCThread(threading.Thread):
                 queue.put_nowait(("/bjoern/ekg", [0]))
                 queue.put_nowait(("/merle/ekg", [0]))
                 queue.put_nowait(("/uwe/ekg", [0]))
+        self.unsubscribe_me()
         print "OSCThread is going down"
 
 
@@ -96,8 +146,9 @@ queue = Queue.Queue()
 class MyHandler(BaseHTTPRequestHandler):
 
     def do_GET(self):
+        print "get"
 
-        self.thread = thread = OSCThread()
+        self.thread = thread = OSCThread(self.server.args)
         thread.daemon = True
         thread.start()
 
@@ -115,9 +166,7 @@ class MyHandler(BaseHTTPRequestHandler):
             scale = 254 / max_items * ix
             return [value / max_items + scale for value in data]
 
-
         try:
-
             self.path=re.sub('[^.a-zA-Z0-9]', "",str(self.path))
             if self.path=="" or self.path==None or self.path[:1]==".":
                 return
@@ -274,14 +323,22 @@ class JustAHTTPServer(HTTPServer):
 
 def main():
     a = create_arg_parser("ekgplotter")
-    add_main_group(a)
+    own_group = add_main_group(a)
+    own_group.add_argument('-x', "--http_host", default=socket.gethostname(),
+        help='my host, defaults to "socket.gethostname()"')
+    own_group.add_argument('-X', "--http_port", default=9000,
+        type=int, help='my port, defaults to 9000')
     add_chaosc_group(a)
     add_subscriber_group(a, "ekgplotter")
     args = finalize_arg_parser(a)
 
     try:
-        server = JustAHTTPServer(('0.0.0.0', 9000), MyHandler)
-        print 'started httpserver...'
+        host, port = socket.getaddrinfo(args.http_host, args.http_port, socket.AF_INET6, socket.SOCK_DGRAM, 0, socket.AI_V4MAPPED | socket.AI_ALL | socket.AI_CANONNAME)[-1][4][:2]
+
+        server = JustAHTTPServer(("0.0.0.0", 9000), MyHandler)
+        server.args = args
+        print "%s: starting up http server on '%s:%d'" % (
+            datetime.now().strftime("%x %X"), host, port)
         server.serve_forever()
     except KeyboardInterrupt:
         print '^C received, shutting down server'
