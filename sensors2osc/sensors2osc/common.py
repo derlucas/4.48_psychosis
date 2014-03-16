@@ -33,6 +33,7 @@ except ImportError as e:
     print(e)
     from chaosc.osc_lib import OSCMessage
 
+
 class Platform(object):
     def __init__(self, args):
         self.args = args
@@ -79,6 +80,6 @@ def init(name):
     args = create_args(name)
     platform = Platform(args)
     platform.connect()
+    atexit.register(platform.close)
 
     return platform
-

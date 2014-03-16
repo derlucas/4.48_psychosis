@@ -20,29 +20,36 @@
 
 from __future__ import absolute_import
 
-import atexit
-import socket
-from sensors2osc import common
+from sensors2osc.common import *
 
-atexit.register(common.close)
+
 
 def main():
-    args, osc_sock = common.init("ekg2osc")
+    platform = init("ekg2osc")
 
-    actor = args.actor
+    actor = platform.args.actor
 
     while 1:
         try:
-            t = ord(common.serial_sock.read(1))
+            t = platform.serial_sock.read(1)
+        except socket.error, msg:
+            # got disconnected?
+            print "serial socket error!!!", msg
+            platform.reconnect()
+
+        try:
+            t = ord(t)
+        except TypeError, e:
+            continue
+
+        try:
             print "got value", t
             osc_message = OSCMessage("/%s/ekg" % actor)
             osc_message.appendTypedArg(t, "i")
-            osc_sock.sendall(osc_message.encode_osc())
+            platform.osc_sock.sendall(osc_message.encode_osc())
         except socket.error, msg:
-            # got disconnected?
-            print "lost connection!!!"
-            common.reconnect(args)
-
+            print "cannot connect to chaosc"
+            continue
 
 
 if __name__ == '__main__':

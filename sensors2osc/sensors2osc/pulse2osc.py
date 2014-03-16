@@ -20,9 +20,11 @@
 
 from __future__ import absolute_import
 
+
+from datetime import datetime
+
 from sensors2osc.common import *
 
-atexit.register(close)
 
 class RingBuffer(object):
     def __init__(self, length):
@@ -41,7 +43,7 @@ class RingBuffer(object):
     def getData(self):
         print "getData", self.ring_buf, self.head
         data = list()
-        for i in range(7, 1, -1):
+        for i in range(self.length + 1, 1, -1):
             value = self.ring_buf[(self.head - i) % self.length]
             if value == -1:
                 self.reset()
@@ -59,44 +61,60 @@ class RingBuffer(object):
 
 
 def main():
-    args, osc_sock = init("pulse2osc")
+    platform = init("pulse2osc")
+
+    actor = platform.args.actor
 
     buf = RingBuffer(6)
     heartbeat_on = False
 
     while 1:
         try:
-            t = ord(serial_sock.read(1))
-            print "got value", t
-            buf.append(t)
-
-            if t == 0:
-                try:
-                    heart_signal, heart_rate, o2, pulse = buf.getData()
-
-                    if pulse == 245 and not heartbeat_on:
-                        osc_message = OSCMessage("/%s/heartbeat" % actor)
-                        osc_message.appendTypedArg(1, "i")
-                        osc_message.appendTypedArg(heart_rate, "i")
-                        osc_message.appendTypedArg(o2, "i")
-                        osc_sock.sendall(osc_message.encode_osc())
-                        print "heartbeat", datetime.datetime.now(), heart_signal
-                        heartbeat_on = True
-                    elif pulse == 1 and heartbeat_on:
-                        #print "off heartbeat", datetime.datetime.now(), heart_signal
-                        heartbeat_on = False
-                        osc_message = OSCMessage("/%s/heartbeat" % actor)
-                        osc_message.appendTypedArg(0, "i")
-                        osc_message.appendTypedArg(heart_rate, "i")
-                        osc_message.appendTypedArg(o2, "i")
-                        osc_sock.sendall(osc_message.encode_osc())
-                except ValueError, e:
-                    print e
+            t = platform.serial_sock.read(1)
         except socket.error, msg:
             # got disconnected?
-            print "lost connection!!!"
-            reconnect(args)
+            print "serial socket error!!!", msg
+            platform.reconnect()
 
+        try:
+            t = ord(t)
+        except TypeError, e:
+            continue
+
+        print "got value", t
+        buf.append(t)
+
+        if t == 0:
+            try:
+                heart_signal, heart_rate, o2, pulse = buf.getData()
+            except ValueError, e:
+                print e
+                continue
+
+            if pulse == 245 and not heartbeat_on:
+                heartbeat_on = True
+                try:
+                    osc_message = OSCMessage("/%s/heartbeat" % actor)
+                    osc_message.appendTypedArg(1, "i")
+                    osc_message.appendTypedArg(heart_rate, "i")
+                    osc_message.appendTypedArg(o2, "i")
+                    platform.osc_sock.sendall(osc_message.encode_osc())
+                    print "on heartbeat", datetime.now(), heart_signal, heart_rate, o2, pulse
+                except socket.error, msg:
+                    print "cannot connect to chaosc"
+                    continue
+            elif pulse == 1 and heartbeat_on:
+                print "off heartbeat", datetime.now(), heart_signal, heart_rate, o2, pulse
+                heartbeat_on = False
+                try:
+                    osc_message = OSCMessage("/%s/heartbeat" % actor)
+                    osc_message.appendTypedArg(0, "i")
+                    osc_message.appendTypedArg(heart_rate, "i")
+                    osc_message.appendTypedArg(o2, "i")
+                    platform.osc_sock.sendall(osc_message.encode_osc())
+                except socket.error, msg:
+                    print "cannot connect to chaosc"
+                    continue
 
 
 if __name__ == '__main__':
