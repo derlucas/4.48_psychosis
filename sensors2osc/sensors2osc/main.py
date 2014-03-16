@@ -94,7 +94,11 @@ class EKG2OSC(Forwarder):
 class RingBuffer(object):
     def __init__(self, length):
         self.length = length
-        self.ring_buf = [-1 for i in xrange(length)]
+        self.ring_buf = list()
+        self.reset()
+
+    def reset(self):
+        self.ring_buf = [-1] * self.length
         self.head = 0
 
     def append(self, value):
@@ -107,10 +111,17 @@ class RingBuffer(object):
         for i in range(7, 1, -1):
             value = self.ring_buf[(self.head - i) % self.length]
             if value == -1:
-                raise ValueError("not complete")
+                self.reset()
+                self.ring_buf[0] = 0
+                self.head = 1
+                raise ValueError("not complete - ringbuffer resettet")
             data.append(value)
         if data[0] != 0x0 or data[1] != 0xff:
-            raise ValueError("not synced")
+            print "issue", data
+            self.reset()
+            self.ring_buf[0] = 0
+            self.head = 1
+            raise ValueError("not synced - ringbuffer resettet")
         return data[2:]
 
 

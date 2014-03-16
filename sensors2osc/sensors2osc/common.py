@@ -33,29 +33,33 @@ except ImportError as e:
     print(e)
     from chaosc.osc_lib import OSCMessage
 
-serial_sock = None
-
-def connect(args):
-    print "connect serial"
-    global serial_sock
-    serial_sock = serial.Serial()
-    serial_sock.port = args.device
-    serial_sock.baudrate = 115200
-    serial_sock.timeout = 0
+class Platform(object):
+    def __init__(self, args):
+        self.args = args
+        self.serial_sock = None
+        self.osc_sock = socket.socket(2, 2, 17)
+        self.osc_sock.connect((self.args.chaosc_host, self.args.chaosc_port))
 
 
-def close():
-    global serial
-    if serial_sock is not None:
-        print "close serial"
-        serial_sock.close()
+    def connect(self):
+        print "connect serial"
+        self.serial_sock = serial.Serial()
+        self.serial_sock.port = self.args.device
+        self.serial_sock.baudrate = 115200
+        self.serial_sock.timeout = 0
+        self.serial_sock.open()
 
 
-def reconnect(args):
-    print "reconnect serial"
-    global serial_sock
-    close()
-    connect(args)
+    def close(self):
+        if self.serial_sock is not None:
+            print "close serial"
+            self.serial_sock.close()
+
+
+    def reconnect(self):
+        print "reconnect serial"
+        self.close()
+        self.connect()
 
 
 def create_args(name):
@@ -70,11 +74,11 @@ def create_args(name):
     args = finalize_arg_parser(arg_parser)
     return args
 
+
 def init(name):
     args = create_args(name)
-    osc_sock = socket.socket(2, 2, 17)
-    osc_sock.connect((args.chaosc_host, args.chaosc_port))
+    platform = Platform(args)
+    platform.connect()
 
-    connect(args)
-    return args, osc_sock
+    return platform
 
