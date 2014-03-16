@@ -17,11 +17,25 @@
 #
 # Copyright (C) 2014 Stefan Kögl
 
+# used this line before opening that script
+# socat -d -d PTY,raw,echo=0,link=/tmp/pty1,b115200,user=stefan PTY,raw,echo=0,link=/tmp/pty2,b115200,user=stefan
+
+
 from __future__ import absolute_import
 
 import time, random
 
-from sensors2osc.main import RingBuffer
+import serial
+
+serial_sock = serial.Serial()
+
+serial_sock = serial.Serial()
+serial_sock.port = "/tmp/pty2"
+serial_sock.baudrate = 115200
+serial_sock.timeout = 0
+serial_sock.open()
+import time, random, struct
+
 
 
 class DataGenenerator(object):
@@ -46,22 +60,8 @@ class DataGenenerator(object):
         self.get_i = (self.get_i + 1) % 6
         return value
 
-def parse(ring_buffer, reader):
-    t = r.read()
-    print t
-    ring_buffer.append(t)
-
-    if t == 0:
-        try:
-            my_data = ring_buffer.getData()
-            print my_data
-        except ValueError, e:
-            print e
-
-
-ring_buffer = RingBuffer(6)
 r = DataGenenerator()
 
 while 1:
-    parse(ring_buffer, r)
+    serial_sock.write(struct.pack("B", r.read()))
     time.sleep(0.5)
