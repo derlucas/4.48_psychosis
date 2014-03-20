@@ -145,6 +145,10 @@ queue = Queue.Queue()
 
 class MyHandler(BaseHTTPRequestHandler):
 
+    def __del__(self):
+        self.thread.running = False
+        self.thread.join()
+
     def do_GET(self):
         print "get"
 
@@ -166,37 +170,71 @@ class MyHandler(BaseHTTPRequestHandler):
             scale = 254 / max_items * ix
             return [value / max_items + scale for value in data]
 
+
         def set_point(plotPoint, pos, value, ix, max_items):
             scale = 254 / max_items * ix
-            plotPoint.setData(x = [pos], y = [6*ix + value / max_items + scale])
+            y = 6 * ix + value / max_items + scale
+            plotPoint.setData(x = [pos], y = [y])
 
 
-        def setValue(dataItem, pos, maxPos, value):
-            dataItem[pos] = value
-            return (pos + 1) % maxPos
+        def find_max_value(item_data):
+            max_index = -1
+            for ix, i in enumerate(item_data):
+                if i > 250:
+                    return ix, i
+            return None, None
 
-        def findMax(dataItem):
-            max_value = 0
-            max_index = 0
-            for ix, i in enumerate(dataItem):
-                if i > max_value:
-                    max_value = i
-                    max_index = ix
-            return max_index
 
-        def rearrange(data, index, max_items):
-            max_value = findMax(data)
+        def rearrange(item_data, actual_pos, max_items):
+            max_value_index, max_value = find_max_value(item_data)
+            if max_value_index is None:
+                return actual_pos
             mean = int(max_items / 2.)
-            start = mean - max_value
-            data.rotate(start)
-            pos = (index + start) % max_items
-            print "rearrange", index, max_items, pos
+            start = mean - max_value_index
+            if start != 0:
+                item_data.rotate(start)
+                pos = (actual_pos + start) % max_items
+            else:
+                pos = actual_pos
+            print "rearrange", mean, start, actual_pos, pos, item_data
             return pos
 
-        def checkDataPoints(value, data_max_value):
-            if value > max_value and value > 200:
-                return True, value
-            return False, data_max_value
+
+        def set_value(item_data, pos, max_pos, value):
+            print "setValue before", pos, None, max_pos, value, item_data, len(item_data)
+            item_data[pos] = value
+            new_pos = (pos + 1) % max_pos
+            print "setValue after ", pos, new_pos, max_pos, value, item_data, len(item_data)
+            return new_pos
+
+        def resize(item_data, max_length, new_max_length, pos):
+            print "resize", max_length, new_max_length
+            if new_max_length < 15:
+                return max_length, pos
+
+            if new_max_length > max_length:
+                pad = (new_max_length - max_length)
+                print "pad", pad
+                for i in range(pad):
+                    if i % 2 == 0:
+                        item_data.append(0)
+                    else:
+                        item_data.appendleft(0)
+                        pos += 1
+                return new_max_length, pos
+            elif new_max_length < max_length:
+                pad = (max_length - new_max_length)
+                for i in range(pad):
+                    if i % 2 == 0:
+                        item_data.pop()
+                        if pos >= new_max_length:
+                            pos = 0
+                    else:
+                        item_data.popleft()
+                        if pos > 0:
+                            pos -= 1
+                return new_max_length, pos
+            return max_length, pos
 
         try:
             self.path=re.sub('[^.a-zA-Z0-9]', "",str(self.path))
@@ -218,6 +256,8 @@ class MyHandler(BaseHTTPRequestHandler):
                 pos2 = 0
                 pos3 = 0
 
+                lengths1 = [0]
+
                 data1_max_value = 0
                 data2_max_value = 0
                 data3_max_value = 0
@@ -229,7 +269,7 @@ class MyHandler(BaseHTTPRequestHandler):
                 plot_data1 = deque([0] * data_points)
                 plot_data2 = deque([0] * data_points)
                 plot_data3 = deque([0] * data_points)
-                plt = PlotWidget(title="<h1>EKG</h1>", name="Merle")
+                plt = PlotWidget(title="<h1>EKG</h1>")
                 plt.hide()
                 plotItem1 = pg.PlotCurveItem(pen=pg.mkPen('r', width=2), width=2, name="bjoern")
                 plotItem2 = pg.PlotCurveItem(pen=pg.mkPen('g', width=2), width=2, name="merle")
@@ -257,12 +297,16 @@ class MyHandler(BaseHTTPRequestHandler):
                 plt.addItem(plotPoint3)
 
                 plt.setLabel('left', "<h2>Amplitude</h2>")
-                plt.setLabel('bottom', "<h2>Time</h2>")
+                plt.setLabel('bottom', "<h2><sup>Time</sup></h2>")
                 plt.showGrid(True, True)
                 ba = plt.getAxis("bottom")
                 bl = plt.getAxis("left")
                 ba.setTicks([])
                 bl.setTicks([])
+                ba.setWidth(0)
+                ba.setHeight(0)
+                bl.setWidth(0)
+                bl.setHeight(0)
                 plt.setYRange(0, 254)
 
                 self.wfile.write("Content-Type: multipart/x-mixed-replace; boundary=--aaboundary")
@@ -281,32 +325,40 @@ class MyHandler(BaseHTTPRequestHandler):
                         value = args[0]
 
                         if osc_address == "/bjoern/ekg":
+                            if value > 250:
+                                data_points, pos1 = resize(plot_data1, len(plot_data1), lengths1[-1], pos1)
+                                foo, pos2 = resize(plot_data2, len(plot_data2), lengths1[-1], pos2)
+                                foo, pos3 = resize(plot_data3, len(plot_data3), lengths1[-1], pos3)
+                                print "length1", lengths1
+                                lengths1.append(0)
+                            else:
+                                lengths1[-1] += 1
+
                             ix = actors.index(plotItem1)
-                            res, tmp = checkDataPoints(value, data1_max_value)
-                            if res and res > 20:
-                                data_points = tmp
-                                data1_maxdata1_max_value = 0
-                            set_point(plotPoint1, pos1, value, ix, max_items)
-                            pos1 = setValue(plot_data1, pos1, data_points, value)
+
                             pos1 = rearrange(plot_data1, pos1, data_points)
+                            set_point(plotPoint1, pos1, value, ix, max_items)
+                            pos1 = set_value(plot_data1, pos1, data_points, value)
                             try:
                                 plotItem1.setData(y=np.array(scale_data(plot_data1, ix, max_items)), clear=True)
                             except ValueError:
                                 pass
+
                         elif osc_address == "/merle/ekg":
                             ix = actors.index(plotItem2)
-                            set_point(plotPoint2, pos2, value, ix, max_items)
-                            pos2 = setValue(plot_data2, pos2, data_points, value)
+
                             pos2 = rearrange(plot_data2, pos2, data_points)
+                            set_point(plotPoint2, pos2, value, ix, max_items)
+                            pos2 = set_value(plot_data2, pos2, data_points, value)
                             try:
                                 plotItem2.setData(y=np.array(scale_data(plot_data2, ix, max_items)), clear=True)
                             except ValueError:
                                 pass
                         elif osc_address == "/uwe/ekg":
                             ix = actors.index(plotItem3)
-                            set_point(plotPoint3, pos3, value, ix, max_items)
-                            pos3 = setValue(plot_data3, pos3, data_points, value)
                             pos3 = rearrange(plot_data3, pos3, data_points)
+                            set_point(plotPoint3, pos3, value, ix, max_items)
+                            pos3 = set_value(plot_data3, pos3, data_points, value)
                             try:
                                 plotItem3.setData(y=np.array(scale_data(plot_data3, ix, max_items)), clear=True)
                             except ValueError:
