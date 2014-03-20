@@ -29,7 +29,30 @@ serial_sock.baudrate = 115200
 serial_sock.timeout = 0
 serial_sock.open()
 
+data_points = 0
+
+steps = 20
+count = 0
 
 while 1:
-    serial_sock.write(struct.pack("B", random.randint(0,255)))
-    time.sleep(0.1)
+    value = random.randint(0, steps)
+    if count < int(steps / 100. * 20):
+        value = random.randint(0,20)
+    elif count < int(steps / 100. * 45):
+        value = random.randint(20,50)
+    elif count == int(steps / 2.):
+        value = 255
+    elif count < int(steps / 100. * 70):
+        value = random.randint(20,50)
+    elif count <= steps:
+        value = random.randint(0,20)
+    elif count >= steps:
+        count = 0
+
+    if data_points % 100 == 0:
+        steps +=1
+
+    time.sleep(0.04)
+    count += 1
+    data_points += 1
+    serial_sock.write(struct.pack("B", value))

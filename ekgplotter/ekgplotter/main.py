@@ -166,6 +166,38 @@ class MyHandler(BaseHTTPRequestHandler):
             scale = 254 / max_items * ix
             return [value / max_items + scale for value in data]
 
+        def set_point(plotPoint, pos, value, ix, max_items):
+            scale = 254 / max_items * ix
+            plotPoint.setData(x = [pos], y = [6*ix + value / max_items + scale])
+
+
+        def setValue(dataItem, pos, maxPos, value):
+            dataItem[pos] = value
+            return (pos + 1) % maxPos
+
+        def findMax(dataItem):
+            max_value = 0
+            max_index = 0
+            for ix, i in enumerate(dataItem):
+                if i > max_value:
+                    max_value = i
+                    max_index = ix
+            return max_index
+
+        def rearrange(data, index, max_items):
+            max_value = findMax(data)
+            mean = int(max_items / 2.)
+            start = mean - max_value
+            data.rotate(start)
+            pos = (index + start) % max_items
+            print "rearrange", index, max_items, pos
+            return pos
+
+        def checkDataPoints(value, data_max_value):
+            if value > max_value and value > 200:
+                return True, value
+            return False, data_max_value
+
         try:
             self.path=re.sub('[^.a-zA-Z0-9]', "",str(self.path))
             if self.path=="" or self.path==None or self.path[:1]==".":
@@ -179,22 +211,38 @@ class MyHandler(BaseHTTPRequestHandler):
                 self.wfile.write(f.read())
                 f.close()
             elif self.path.endswith(".mjpeg"):
-                data_points = 1000
+                data_points = 21
 
                 self.send_response(200)
-                plot_data1 = data = deque([0] * data_points)
-                plot_data2 = data = deque([0] * data_points)
-                plot_data3 = data = deque([0] * data_points)
+                pos1 = 0
+                pos2 = 0
+                pos3 = 0
+
+                data1_max_value = 0
+                data2_max_value = 0
+                data3_max_value = 0
+
+                data1_distance = data_points
+                data2_distance = data_points
+                data3_distance = data_points
+
+                plot_data1 = deque([0] * data_points)
+                plot_data2 = deque([0] * data_points)
+                plot_data3 = deque([0] * data_points)
                 plt = PlotWidget(title="<h1>EKG</h1>", name="Merle")
                 plt.hide()
-                plotItem1 = pg.PlotCurveItem(pen=pg.mkPen('r', width=2), name="bjoern")
-                plotItem2 = pg.PlotCurveItem(pen=pg.mkPen('g', width=2), name="merle")
-                plotItem3 = pg.PlotCurveItem(pen=pg.mkPen('b', width=2), name="uwe")
-                print type(plotItem1)
-                pen = pg.mkPen(254, 254, 254)
-                plotItem1.setShadowPen(pen=pen, width=6, cosmetic=True)
-                plotItem2.setShadowPen(pen=pen, width=6, cosmetic=True)
-                plotItem3.setShadowPen(pen=pen, width=6, cosmetic=True)
+                plotItem1 = pg.PlotCurveItem(pen=pg.mkPen('r', width=2), width=2, name="bjoern")
+                plotItem2 = pg.PlotCurveItem(pen=pg.mkPen('g', width=2), width=2, name="merle")
+                plotItem3 = pg.PlotCurveItem(pen=pg.mkPen('b', width=2), width=2, name="uwe")
+                shadowPen = pg.mkPen("w", width=10)
+                plotItem1.setShadowPen(pen=shadowPen, width=6, cosmetic=True)
+                plotItem2.setShadowPen(pen=shadowPen, width=6, cosmetic=True)
+                plotItem3.setShadowPen(pen=shadowPen, width=6, cosmetic=True)
+                pen = pg.mkPen("w", size=1)
+                brush = pg.mkBrush("w")
+                plotPoint1 = pg.ScatterPlotItem(pen=pen, brush=brush, size=10)
+                plotPoint2 = pg.ScatterPlotItem(pen=pen, brush=brush, size=10)
+                plotPoint3 = pg.ScatterPlotItem(pen=pen, brush=brush, size=10)
                 actors.append(plotItem1)
                 actors.append(plotItem2)
                 actors.append(plotItem3)
@@ -204,6 +252,9 @@ class MyHandler(BaseHTTPRequestHandler):
                 plt.addItem(plotItem1)
                 plt.addItem(plotItem2)
                 plt.addItem(plotItem3)
+                plt.addItem(plotPoint1)
+                plt.addItem(plotPoint2)
+                plt.addItem(plotPoint3)
 
                 plt.setLabel('left', "<h2>Amplitude</h2>")
                 plt.setLabel('bottom', "<h2>Time</h2>")
@@ -226,27 +277,38 @@ class MyHandler(BaseHTTPRequestHandler):
                             osc_address, args = queue.get_nowait()
                         except Queue.Empty:
                             break
-
+                        max_items = len(actors)
                         value = args[0]
+
                         if osc_address == "/bjoern/ekg":
-                            plot_data1.append(value)
-                            plot_data1.popleft()
+                            ix = actors.index(plotItem1)
+                            res, tmp = checkDataPoints(value, data1_max_value)
+                            if res and res > 20:
+                                data_points = tmp
+                                data1_maxdata1_max_value = 0
+                            set_point(plotPoint1, pos1, value, ix, max_items)
+                            pos1 = setValue(plot_data1, pos1, data_points, value)
+                            pos1 = rearrange(plot_data1, pos1, data_points)
                             try:
-                                plotItem1.setData(y=np.array(scale_data(plot_data1, actors.index(plotItem1), len(actors))), clear=True)
+                                plotItem1.setData(y=np.array(scale_data(plot_data1, ix, max_items)), clear=True)
                             except ValueError:
                                 pass
                         elif osc_address == "/merle/ekg":
-                            plot_data2.append(value)
-                            plot_data2.popleft()
+                            ix = actors.index(plotItem2)
+                            set_point(plotPoint2, pos2, value, ix, max_items)
+                            pos2 = setValue(plot_data2, pos2, data_points, value)
+                            pos2 = rearrange(plot_data2, pos2, data_points)
                             try:
-                                plotItem2.setData(y=np.array(scale_data(plot_data2, actors.index(plotItem2), len(actors))), clear=True)
+                                plotItem2.setData(y=np.array(scale_data(plot_data2, ix, max_items)), clear=True)
                             except ValueError:
                                 pass
                         elif osc_address == "/uwe/ekg":
-                            plot_data3.append(value)
-                            plot_data3.popleft()
+                            ix = actors.index(plotItem3)
+                            set_point(plotPoint3, pos3, value, ix, max_items)
+                            pos3 = setValue(plot_data3, pos3, data_points, value)
+                            pos3 = rearrange(plot_data3, pos3, data_points)
                             try:
-                                plotItem3.setData(y=np.array(scale_data(plot_data3, actors.index(plotItem3), len(actors))), clear=True)
+                                plotItem3.setData(y=np.array(scale_data(plot_data3, ix, max_items)), clear=True)
                             except ValueError:
                                 pass
                         elif osc_address == "/plot/uwe":
@@ -312,10 +374,6 @@ class MyHandler(BaseHTTPRequestHandler):
         except IOError:
             self.send_error(404,'File Not Found: %s' % self.path)
 
-    def __del__(self):
-        self.thread.running = False
-        self.thread.join()
-
 
 class JustAHTTPServer(HTTPServer):
     pass
@@ -324,7 +382,7 @@ class JustAHTTPServer(HTTPServer):
 def main():
     a = create_arg_parser("ekgplotter")
     own_group = add_main_group(a)
-    own_group.add_argument('-x', "--http_host", default=socket.gethostname(),
+    own_group.add_argument('-x', "--http_host", default="0.0.0.0",
         help='my host, defaults to "socket.gethostname()"')
     own_group.add_argument('-X', "--http_port", default=9000,
         type=int, help='my port, defaults to 9000')
