@@ -8,8 +8,9 @@ import re
 
 from collections import deque
 
-from PyQt4.QtCore import QBuffer, QByteArray, QIODevice
+from PyQt4.QtCore import QBuffer, QByteArray, QIODevice, QThread, QObject
 from PyQt4 import QtGui
+from PyQt4 import QtCore
 import pyqtgraph as pg
 
 from pyqtgraph.widgets.PlotWidget import PlotWidget
@@ -41,7 +42,71 @@ class PlotWindow(PlotWidget):
             self.win.setWindowTitle(title)
 
 
-class MyHandler(BaseHTTPRequestHandler):
+class WorkThread(QThread):
+    osc_received = QtCore.pyqtSignal(str, int, name='osc_received')
+
+    def __init__(self):
+        QThread.__init__(self)
+        self.osc_sock = socket.socket(2, 2, 17)
+        self.osc_sock.setblocking(0)
+        self.osc_sock.setsockopt(socket.SOL_SOCKET,
+            socket.SO_RCVBUF, 4096 * 8)
+        self.osc_sock.bind(("", 10000))
+
+
+    def __del__(self):
+        self.wait()
+
+    def run(self):
+        while 1:
+            reads, writes, errs = select.select([self.osc_sock], [], [], 0.01)
+            if reads:
+                osc_input = reads[0].recv(4096)
+                osc_address, typetags, args = decode_osc(osc_input, 0, len(osc_input))
+                print "signal", osc_address, args[0]
+                self.osc_received.emit(osc_address, args[0])
+
+
+class MyHandler(QtCore.QObject, BaseHTTPRequestHandler):
+
+    def __init__(self, request, client_address, parent):
+        self.plot_data1 = deque([0] * 100)
+        self.plot_data2 = deque([254/3] * 100)
+        self.plot_data3 = deque([254/3*2] * 100)
+        self.is_item1 = True
+        self.is_item2 = True
+        self.is_item3 = True
+        QtCore.QObject.__init__(self)
+        BaseHTTPRequestHandler.__init__(self, request, client_address, parent)
+
+    @QtCore.pyqtSlot('QString', int, name="receive_osc")
+    def receive_osc(self, osc_address, value):
+        print "change", osc_address, value
+        if osc_address == "/bjoern/ekg":
+            self.plot_data1.appendleft(args[0] / 3)
+            self.plot_data1.pop()
+        elif osc_address == "/merle/ekg":
+            self.plot_data2.appendleft(args[0] / 3 + 254/3)
+            self.plot_data2.pop()
+        elif osc_address == "/uwe/ekg":
+            self.plot_data3.appendleft(args[0] / 3 + 254/3*2)
+            self.plot_data3.pop()
+        elif osc_address == "/plot/uwe":
+            if value == 1 and self.is_item3 == False:
+                self.plt.addItem(self.plotItem3)
+            elif value == 0 and self.is_item3 == True:
+                self.plt.removeItem(self.plotItem3)
+        elif osc_address == "/plot/merle":
+            if value == 1 and self.is_item2 == False:
+                self.plt.addItem(self.plotItem2)
+            elif value == 0 and self.is_item2 == True:
+                self.plt.removeItem(self.plotItem2)
+        elif osc_address == "/plot/bjoern":
+            if value == 1 and self.is_item1 == False:
+                self.plt.addItem(self.plotItem1)
+            elif value == 0 and self.is_item1 == True:
+                self.plt.removeItem(self.plotItem1)
+
     def do_GET(self):
         print "get"
         global plotValues
@@ -58,18 +123,21 @@ class MyHandler(BaseHTTPRequestHandler):
                 f.close()
                 return
             if self.path.endswith(".mjpeg"):
+                self.thread = WorkThread()
+                #self.thread.osc_received.connect(self.change)
+                #self.connect(self.thread, thread.osc_received, self.change)
+                self.thread.osc_received.connect(self.receive_osc)
+                self.thread.start()
+
                 self.send_response(200)
 
-                plot_data1 = deque([0] * 100)
-                plot_data2 = deque([254/3] * 100)
-                plot_data3 = deque([254/3*2] * 100)
-                plt = PlotWindow(title="EKG", name="Merle")
+                self.plt = plt = PlotWindow(title="EKG", name="Merle")
                 plt.addLegend()
                 #plt = pg.plot(pen=(0, 3*1.3))
                 plt.resize(1280, 720)
-                plotItem1 = pg.PlotCurveItem(pen=(0, 3*1.3), name="bjoern")
-                plotItem2 = pg.PlotCurveItem(pen=(1, 3*1.3), name="merle")
-                plotItem3 = pg.PlotCurveItem(pen=(2, 3*1.3), name="uwe")
+                self.plotItem1 = plotItem1 = pg.PlotCurveItem(pen=pg.mkPen('r', width=4), name="bjoern")
+                self.plotItem2 = plotItem2 = pg.PlotCurveItem(pen=pg.mkPen('g', width=4), name="merle")
+                self.plotItem3 = plotItem3 = pg.PlotCurveItem(pen=pg.mkPen('b', width=4), name="uwe")
                 plotItem1.setPos(0, 0*6)
                 plotItem2.setPos(0, 1*6)
                 plotItem3.setPos(0, 2*6)
@@ -85,36 +153,17 @@ class MyHandler(BaseHTTPRequestHandler):
                 ba.setTicks([])
                 bl.setTicks([])
                 plt.setYRange(0, 254)
-                print type(plt)
+                #print type(plt)
                 self.wfile.write("Content-Type: multipart/x-mixed-replace; boundary=--aaboundary")
                 self.wfile.write("\r\n\r\n")
-                osc_sock = socket.socket(2, 2, 17)
-                osc_sock.bind(("", 10000))
-                osc_sock.setblocking(0)
+
                 last = time.time()
                 now = last
 
                 while 1:
-                    for i in xrange(3):
-                        reads, writes, errs = select.select([osc_sock], [], [], 0.01)
-                        #print reads, writes, errs
-                        if reads:
-                            osc_input = reads[0].recv(4096)
-                            osc_address, typetags, args = decode_osc(osc_input, 0, len(osc_input))
-                            #print "osc", osc_address, typetags, args
-                            if osc_address.startswith("/bjoern"):
-                                plot_data1.appendleft(args[0] / 3)
-                                plot_data1.pop()
-                            elif osc_address.startswith("/merle"):
-                                plot_data2.appendleft(args[0] / 3 + 254/3)
-                                plot_data2.pop()
-                            elif osc_address.startswith("/uwe"):
-                                plot_data3.appendleft(args[0] / 3 + 254/3*2)
-                                plot_data3.pop()
-
-                    plotItem1.setData(y=np.array(plot_data1), clear=True)
-                    plotItem2.setData(y=np.array(plot_data2), clear=True)
-                    plotItem3.setData(y=np.array(plot_data3), clear=True)
+                    plotItem1.setData(y=np.array(self.plot_data1), clear=True)
+                    plotItem2.setData(y=np.array(self.plot_data2), clear=True)
+                    plotItem3.setData(y=np.array(self.plot_data3), clear=True)
                     #item = plt.plot(plot_data1, pen=(0, 3*1.3), clear=True)
 
                     exporter = pg.exporters.ImageExporter.ImageExporter(plt.plotItem)
@@ -133,7 +182,7 @@ class MyHandler(BaseHTTPRequestHandler):
                     self.wfile.write("\r\n\r\n\r\n")
                     now = time.time()
                     dur = now - last
-                    print dur
+                    #print dur
                     wait = 0.04 - dur
                     if wait > 0:
                         time.sleep(wait)
@@ -152,9 +201,8 @@ class MyHandler(BaseHTTPRequestHandler):
             self.send_error(404,'File Not Found: %s' % self.path)
 
 
-#class ThreadedHTTPServer(ThreadingMixIn, HTTPServer):
 class ThreadedHTTPServer(HTTPServer, ForkingMixIn):
-    """Handle requests in a separate thread."""
+    """Handle requests in a separate process."""
 
 def main():
     try:

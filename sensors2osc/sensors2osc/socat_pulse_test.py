@@ -59,4 +59,4 @@ r = DataGenenerator()
 
 while 1:
     serial_sock.write(struct.pack("B", r.read()))
-    time.sleep(0.1)
+    #time.sleep(0.1)

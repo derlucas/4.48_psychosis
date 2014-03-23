@@ -88,8 +88,6 @@ def main():
         except socket.error, msg:
             print "cannot connect to chaosc", msg
             continue
-        time.sleep(0.1)
-
 
 
 if __name__ == '__main__':

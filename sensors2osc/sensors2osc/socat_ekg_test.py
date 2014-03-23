@@ -31,14 +31,19 @@ serial_sock.open()
 
 data_points = 0
 
-steps = 20
+min_steps = 17
+max_steps = 43
+steps = random.randint(17,43)
 count = 0
+delta = 1
+
+result = list()
 
 while 1:
     value = random.randint(0, steps)
     if count < int(steps / 100. * 20):
         value = random.randint(0,20)
-    elif count < int(steps / 100. * 45):
+    elif count < int(steps / 2.):
         value = random.randint(20,50)
     elif count == int(steps / 2.):
         value = 255
@@ -49,10 +54,17 @@ while 1:
     elif count >= steps:
         count = 0
 
-    if data_points % 100 == 0:
-        steps +=1
+    if data_points % (5 * steps) == 0:
+        print "new steps", steps, delta
+        steps += delta
 
-    time.sleep(0.04)
+    if steps <= min_steps:
+        delta = 1
+    elif steps >= max_steps:
+        print "change step sign", steps, delta
+        delta = -1
+
+    time.sleep(0.02)
     count += 1
     data_points += 1
     serial_sock.write(struct.pack("B", value))

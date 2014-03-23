@@ -38,7 +38,7 @@ class Platform(object):
     def __init__(self, args):
         self.args = args
         self.serial_sock = None
-        self.osc_sock = socket.socket(2, 2, 17)
+        self.osc_sock = socket.socket(10, 2, 17)
         self.osc_sock.connect((self.args.chaosc_host, self.args.chaosc_port))
 
 
@@ -48,7 +48,13 @@ class Platform(object):
         self.serial_sock.port = self.args.device
         self.serial_sock.baudrate = 115200
         self.serial_sock.timeout = 0
-        self.serial_sock.open()
+        print "waiting for the device %r to come up" % self.args.device
+        while 1:
+            try:
+                self.serial_sock.open()
+                break
+            except serial.serialtuil.SerialException:
+                pass
 
 
     def close(self):

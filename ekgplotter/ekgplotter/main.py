@@ -24,6 +24,9 @@
 
 from __future__ import absolute_import
 
+
+#import objgraph
+
 from  datetime import datetime
 import threading
 import Queue
@@ -37,21 +40,25 @@ import re
 
 from collections import deque
 
+
 from PyQt4.QtCore import QBuffer, QByteArray, QIODevice
 from PyQt4 import QtGui
+
 import pyqtgraph as pg
 
 from pyqtgraph.widgets.PlotWidget import PlotWidget
 
 from chaosc.argparser_groups import *
+from chaosc.lib import resolve_host
 
-try:
-    from chaosc.c_osc_lib import *
-except ImportError:
-    from chaosc.osc_lib import *
+#try:
+    #from chaosc.c_osc_lib import *
+#except ImportError:
+from chaosc.osc_lib import *
 
 QtGui.QApplication.setGraphicsSystem('opengl')
 
+print "systemInfo", pg.systemInfo()
 
 try:
     from chaosc.c_osc_lib import decode_osc
@@ -82,7 +89,7 @@ class OSCThread(threading.Thread):
 
         self.chaosc_address = chaosc_host, chaosc_port = socket.getaddrinfo(args.chaosc_host, args.chaosc_port, socket.AF_INET6, socket.SOCK_DGRAM, 0, socket.AI_V4MAPPED | socket.AI_ALL | socket.AI_CANONNAME)[-1][4][:2]
 
-        self.osc_sock = socket.socket(2, 2, 17)
+        self.osc_sock = socket.socket(10, 2, 17)
         self.osc_sock.bind(self.own_address)
         self.osc_sock.setblocking(0)
 
@@ -131,6 +138,7 @@ class OSCThread(threading.Thread):
             if reads:
                 osc_input = reads[0].recv(4096)
                 osc_address, typetags, messages = decode_osc(osc_input, 0, len(osc_input))
+                #print "thread osc_address", osc_address
                 if osc_address.find("ekg") > -1 or osc_address.find("plot") != -1:
                     queue.put_nowait((osc_address, messages))
             else:
@@ -143,6 +151,166 @@ class OSCThread(threading.Thread):
 
 queue = Queue.Queue()
 
+class Actor(object):
+    shadowPen = pg.mkPen(255, 255, 255)
+    brush = pg.mkBrush("w")
+    def __init__(self, name, num_data, color):
+        self.data = [0] * num_data
+        self.data_pointer = 0
+        self.name = name
+        self.active = True
+        self.plotItem = pg.PlotCurveItem(pen=pg.mkPen(color, width=3), name=name)
+        self.num_data = num_data
+        #self.plotItem.setShadowPen(pen=Actor.shadowPen, width=3, cosmetic=True)
+        self.plotPoint = pg.ScatterPlotItem(pen=Actor.shadowPen, brush=self.brush, size=5)
+
+
+    def scale_data(self, ix, max_items):
+        scale = 255 / max_items * ix
+        return [value / max_items + scale for value in self.data]
+
+    def set_point(self, value, ix, max_items):
+        scale = 255 / max_items * ix
+        self.plotPoint.setData(x = [self.data_pointer], y = [value / max_items + scale])
+
+    #def find_max_value(self, item_data):
+            #max_index = -1
+            #for ix, i in enumerate(item_data):
+                #if i > 250:
+                    #return ix, i
+            #return None, None
+
+
+    #def rearrange(self, item_data, actual_pos, max_items):
+        #max_value_index, max_value = find_max_value(item_data)
+        #if max_value_index is None:
+            #return actual_pos
+        #mean = int(max_items / 2.)
+        #start = mean - max_value_index
+        #if start != 0:
+            #item_data.rotate(start)
+            #pos = (actual_pos + start) % max_items
+        #else:
+            #pos = actual_pos
+        #print "rearrange", mean, start, actual_pos, pos, item_data
+        #return pos
+
+
+    def set_value(self, value):
+        self.data[self.data_pointer] = value
+        self.data_pointer = (self.data_pointer + 1) % self.num_data
+
+    #def resize(item_data, max_length, new_max_length, pos):
+        #print "resize", max_length, new_max_length
+        #if new_max_length < 15:
+            #return max_length, pos
+
+        #if new_max_length > max_length:
+            #pad = (new_max_length - max_length)
+            #print "pad", pad
+            #for i in range(pad):
+                #if i % 2 == 0:
+                    #item_data.append(0)
+                #else:
+                    #item_data.appendleft(0)
+                    #pos += 1
+            #return new_max_length, pos
+        #elif new_max_length < max_length:
+            #pad = (max_length - new_max_length)
+            #for i in range(pad):
+                #if i % 2 == 0:
+                    #item_data.pop()
+                    #if pos >= new_max_length:
+                        #pos = 0
+                #else:
+                    #item_data.popleft()
+                    #if pos > 0:
+                        #pos -= 1
+            #return new_max_length, pos
+        #return max_length, pos
+
+class EkgPlot(object):
+    def __init__(self, actor_names, num_data, colors):
+
+        self.plot = pg.PlotWidget(title="<h1>EKG</h1>")
+        self.plot.hide()
+        self.plot.setLabel('left', "<h2>Amplitude</h2>")
+        self.plot.setLabel('bottom', "<h2><sup>Time</sup></h2>")
+        self.plot.showGrid(True, True)
+        self.plot.setYRange(0, 255)
+        self.plot.setXRange(0, num_data)
+        self.plot.resize(1280, 720)
+
+        ba = self.plot.getAxis("bottom")
+        bl = self.plot.getAxis("left")
+        ba.setTicks([])
+        bl.setTicks([])
+        self.active_actors = list()
+
+        self.actors = dict()
+        self.lengths1 = [0]
+        self.num_data = num_data
+
+        for actor_name, color in zip(actor_names, colors):
+            self.add_actor(actor_name, num_data, color)
+
+        self.set_positions()
+
+        self.ekg_regex = re.compile("^/(.*?)/ekg$")
+        self.ctl_regex = re.compile("^/plot/(.*?)$")
+        self.updated_actors = set()
+
+
+    def add_actor(self, actor_name, num_data, color):
+        actor_obj = Actor(actor_name, num_data, color)
+        self.actors[actor_name] = actor_obj
+        self.plot.addItem(actor_obj.plotItem)
+        self.plot.addItem(actor_obj.plotPoint)
+        self.active_actors.append(actor_obj)
+
+
+    def set_positions(self):
+        for ix, actor_obj in enumerate(self.active_actors):
+            actor_obj.plotItem.setPos(0, ix * 6)
+            actor_obj.plotPoint.setPos(0, ix * 6)
+
+    def active_actor_count(self):
+        return len(self.active_actors)
+
+    def update(self, osc_address, value):
+
+        res = self.ekg_regex.match(osc_address)
+        if res:
+            actor_name = res.group(1)
+            actor_obj = self.actors[actor_name]
+            max_actors = len(self.active_actors)
+            ix = self.active_actors.index(actor_obj)
+            actor_data = actor_obj.data
+            data_pointer = actor_obj.data_pointer
+            actor_data[data_pointer] = value
+            actor_obj.set_point(value, ix, max_actors)
+            actor_obj.data_pointer = (data_pointer + 1) % self.num_data
+            actor_obj.plotItem.setData(y=np.array(actor_obj.scale_data(ix, max_actors)), clear=True)
+            return
+
+        res = self.ctl_regex.match(osc_address)
+        if res:
+            actor_name = res.group(1)
+            actor_obj = self.actors[actor_name]
+            if value == 1 and not actor_obj.active:
+                print "actor on", actor_name
+                self.plot.addItem(actor_obj)
+                actor_obj.active = True
+                self.active_actors.append(actor_obj)
+            elif value == 0 and not actor_obj.active:
+                print "actor off", actor_name
+                self.plot.removeItem(actor_obj)
+                actor_obj.active = True
+                self.active_actors.remove(actor_obj)
+
+            self.set_positions()
+
+
 class MyHandler(BaseHTTPRequestHandler):
 
     def __del__(self):
@@ -150,96 +318,12 @@ class MyHandler(BaseHTTPRequestHandler):
         self.thread.join()
 
     def do_GET(self):
-        print "get"
-
-        self.thread = thread = OSCThread(self.server.args)
-        thread.daemon = True
-        thread.start()
-
-        actors = list()
-        is_item1 = True
-        is_item2 = True
-        is_item3 = True
-
-        def setPositions():
-            for ix, item in enumerate(actors):
-                item.setPos(0, ix*6)
-
-
-        def scale_data(data, ix, max_items):
-            scale = 254 / max_items * ix
-            return [value / max_items + scale for value in data]
-
-
-        def set_point(plotPoint, pos, value, ix, max_items):
-            scale = 254 / max_items * ix
-            y = 6 * ix + value / max_items + scale
-            plotPoint.setData(x = [pos], y = [y])
-
-
-        def find_max_value(item_data):
-            max_index = -1
-            for ix, i in enumerate(item_data):
-                if i > 250:
-                    return ix, i
-            return None, None
-
-
-        def rearrange(item_data, actual_pos, max_items):
-            max_value_index, max_value = find_max_value(item_data)
-            if max_value_index is None:
-                return actual_pos
-            mean = int(max_items / 2.)
-            start = mean - max_value_index
-            if start != 0:
-                item_data.rotate(start)
-                pos = (actual_pos + start) % max_items
-            else:
-                pos = actual_pos
-            print "rearrange", mean, start, actual_pos, pos, item_data
-            return pos
-
-
-        def set_value(item_data, pos, max_pos, value):
-            print "setValue before", pos, None, max_pos, value, item_data, len(item_data)
-            item_data[pos] = value
-            new_pos = (pos + 1) % max_pos
-            print "setValue after ", pos, new_pos, max_pos, value, item_data, len(item_data)
-            return new_pos
-
-        def resize(item_data, max_length, new_max_length, pos):
-            print "resize", max_length, new_max_length
-            if new_max_length < 15:
-                return max_length, pos
-
-            if new_max_length > max_length:
-                pad = (new_max_length - max_length)
-                print "pad", pad
-                for i in range(pad):
-                    if i % 2 == 0:
-                        item_data.append(0)
-                    else:
-                        item_data.appendleft(0)
-                        pos += 1
-                return new_max_length, pos
-            elif new_max_length < max_length:
-                pad = (max_length - new_max_length)
-                for i in range(pad):
-                    if i % 2 == 0:
-                        item_data.pop()
-                        if pos >= new_max_length:
-                            pos = 0
-                    else:
-                        item_data.popleft()
-                        if pos > 0:
-                            pos -= 1
-                return new_max_length, pos
-            return max_length, pos
 
         try:
             self.path=re.sub('[^.a-zA-Z0-9]', "",str(self.path))
             if self.path=="" or self.path==None or self.path[:1]==".":
-                return
+                self.send_error(403,'Forbidden')
+
 
             if self.path.endswith(".html"):
                 f = open(curdir + sep + self.path)
@@ -249,168 +333,49 @@ class MyHandler(BaseHTTPRequestHandler):
                 self.wfile.write(f.read())
                 f.close()
             elif self.path.endswith(".mjpeg"):
-                data_points = 21
+                self.thread = thread = OSCThread(self.server.args)
+                thread.daemon = True
+                thread.start()
 
                 self.send_response(200)
-                pos1 = 0
-                pos2 = 0
-                pos3 = 0
-
-                lengths1 = [0]
-
-                data1_max_value = 0
-                data2_max_value = 0
-                data3_max_value = 0
-
-                data1_distance = data_points
-                data2_distance = data_points
-                data3_distance = data_points
-
-                plot_data1 = deque([0] * data_points)
-                plot_data2 = deque([0] * data_points)
-                plot_data3 = deque([0] * data_points)
-                plt = PlotWidget(title="<h1>EKG</h1>")
-                plt.hide()
-                plotItem1 = pg.PlotCurveItem(pen=pg.mkPen('r', width=2), width=2, name="bjoern")
-                plotItem2 = pg.PlotCurveItem(pen=pg.mkPen('g', width=2), width=2, name="merle")
-                plotItem3 = pg.PlotCurveItem(pen=pg.mkPen('b', width=2), width=2, name="uwe")
-                shadowPen = pg.mkPen("w", width=10)
-                plotItem1.setShadowPen(pen=shadowPen, width=6, cosmetic=True)
-                plotItem2.setShadowPen(pen=shadowPen, width=6, cosmetic=True)
-                plotItem3.setShadowPen(pen=shadowPen, width=6, cosmetic=True)
-                pen = pg.mkPen("w", size=1)
-                brush = pg.mkBrush("w")
-                plotPoint1 = pg.ScatterPlotItem(pen=pen, brush=brush, size=10)
-                plotPoint2 = pg.ScatterPlotItem(pen=pen, brush=brush, size=10)
-                plotPoint3 = pg.ScatterPlotItem(pen=pen, brush=brush, size=10)
-                actors.append(plotItem1)
-                actors.append(plotItem2)
-                actors.append(plotItem3)
-                plotItem1.setPos(0, 0*6)
-                plotItem2.setPos(0, 1*6)
-                plotItem3.setPos(0, 2*6)
-                plt.addItem(plotItem1)
-                plt.addItem(plotItem2)
-                plt.addItem(plotItem3)
-                plt.addItem(plotPoint1)
-                plt.addItem(plotPoint2)
-                plt.addItem(plotPoint3)
-
-                plt.setLabel('left', "<h2>Amplitude</h2>")
-                plt.setLabel('bottom', "<h2><sup>Time</sup></h2>")
-                plt.showGrid(True, True)
-                ba = plt.getAxis("bottom")
-                bl = plt.getAxis("left")
-                ba.setTicks([])
-                bl.setTicks([])
-                ba.setWidth(0)
-                ba.setHeight(0)
-                bl.setWidth(0)
-                bl.setHeight(0)
-                plt.setYRange(0, 254)
-
-                self.wfile.write("Content-Type: multipart/x-mixed-replace; boundary=--aaboundary")
-                self.wfile.write("\r\n\r\n")
+                actor_names = ["bjoern", "merle", "uwe"]
+                num_data = 100
+                colors = ["r", "g", "b"]
+                plotter = EkgPlot(actor_names, num_data, colors)
 
 
-                plt.resize(1280, 720)
-
+                self.wfile.write("Content-Type: multipart/x-mixed-replace; boundary=--aaboundary\r\n\r\n")
+                #lastTime = time.time()
+                #fps = None
                 while 1:
                     while 1:
                         try:
                             osc_address, args = queue.get_nowait()
                         except Queue.Empty:
                             break
-                        max_items = len(actors)
-                        value = args[0]
 
-                        if osc_address == "/bjoern/ekg":
-                            if value > 250:
-                                data_points, pos1 = resize(plot_data1, len(plot_data1), lengths1[-1], pos1)
-                                foo, pos2 = resize(plot_data2, len(plot_data2), lengths1[-1], pos2)
-                                foo, pos3 = resize(plot_data3, len(plot_data3), lengths1[-1], pos3)
-                                print "length1", lengths1
-                                lengths1.append(0)
-                            else:
-                                lengths1[-1] += 1
+                        plotter.update(osc_address, args[0])
 
-                            ix = actors.index(plotItem1)
-
-                            pos1 = rearrange(plot_data1, pos1, data_points)
-                            set_point(plotPoint1, pos1, value, ix, max_items)
-                            pos1 = set_value(plot_data1, pos1, data_points, value)
-                            try:
-                                plotItem1.setData(y=np.array(scale_data(plot_data1, ix, max_items)), clear=True)
-                            except ValueError:
-                                pass
-
-                        elif osc_address == "/merle/ekg":
-                            ix = actors.index(plotItem2)
-
-                            pos2 = rearrange(plot_data2, pos2, data_points)
-                            set_point(plotPoint2, pos2, value, ix, max_items)
-                            pos2 = set_value(plot_data2, pos2, data_points, value)
-                            try:
-                                plotItem2.setData(y=np.array(scale_data(plot_data2, ix, max_items)), clear=True)
-                            except ValueError:
-                                pass
-                        elif osc_address == "/uwe/ekg":
-                            ix = actors.index(plotItem3)
-                            pos3 = rearrange(plot_data3, pos3, data_points)
-                            set_point(plotPoint3, pos3, value, ix, max_items)
-                            pos3 = set_value(plot_data3, pos3, data_points, value)
-                            try:
-                                plotItem3.setData(y=np.array(scale_data(plot_data3, ix, max_items)), clear=True)
-                            except ValueError:
-                                pass
-                        elif osc_address == "/plot/uwe":
-                            if value == 1 and is_item3 == False:
-                                print "uwe on"
-                                plt.addItem(plotItem3)
-                                is_item3 = True
-                                actors.append(plotItem3)
-                                setPositions()
-                            elif value == 0 and is_item3 == True:
-                                print "uwe off"
-                                plt.removeItem(plotItem3)
-                                is_item3 = False
-                                actors.remove(plotItem3)
-                                setPositions()
-                        elif osc_address == "/plot/merle":
-                            if value == 1 and is_item2 == False:
-                                print "merle on"
-                                plt.addItem(plotItem2)
-                                is_item2 = True
-                                actors.append(plotItem2)
-                                setPositions()
-                            elif value == 0 and is_item2 == True:
-                                print "merle off"
-                                plt.removeItem(plotItem2)
-                                is_item2 = False
-                                actors.remove(plotItem2)
-                                setPositions()
-                        elif osc_address == "/plot/bjoern":
-                            if value == 1 and is_item1 == False:
-                                print "bjoern on"
-                                plt.addItem(plotItem1)
-                                is_item1 = True
-                                actors.append(plotItem1)
-                                setPositions()
-                            elif value == 0 and is_item1 == True:
-                                print "bjoern off"
-                                plt.removeItem(plotItem1)
-                                is_item1 = False
-                                actors.remove(plotItem1)
-                                setPositions()
-
-                    exporter = pg.exporters.ImageExporter.ImageExporter(plt.plotItem)
+                    exporter = pg.exporters.ImageExporter.ImageExporter(plotter.plot.plotItem)
                     img = exporter.export("tmpfile", True)
                     buffer = QBuffer()
                     buffer.open(QIODevice.WriteOnly)
                     img.save(buffer, "JPG", 100)
                     JpegData = buffer.data()
-                    del buffer
                     self.wfile.write("--aaboundary\r\nContent-Type: image/jpeg\r\nContent-length: %d\r\n\r\n%s\r\n\r\n\r\n" % (len(JpegData), JpegData))
+                    del JpegData
+                    del buffer
+                    del img
+                    del exporter
+                    #now = time.time()
+                    #dt = now - lastTime
+                    #lastTime = now
+                    #if fps is None:
+                        #fps = 1.0/dt
+                    #else:
+                        #s = np.clip(dt*3., 0, 1)
+                        #fps = fps * (1-s) + (1.0/dt) * s
+                    #print '%0.2f fps' % fps
 
             elif self.path.endswith(".jpeg"):
                 f = open(curdir + sep + self.path)
@@ -421,6 +386,7 @@ class MyHandler(BaseHTTPRequestHandler):
                 f.close()
             return
         except (KeyboardInterrupt, SystemError):
+            print "queue size", queue.qsize()
             thread.running = False
             thread.join()
         except IOError:
@@ -428,13 +394,14 @@ class MyHandler(BaseHTTPRequestHandler):
 
 
 class JustAHTTPServer(HTTPServer):
+    address_family = socket.AF_INET6
     pass
 
 
 def main():
     a = create_arg_parser("ekgplotter")
     own_group = add_main_group(a)
-    own_group.add_argument('-x', "--http_host", default="0.0.0.0",
+    own_group.add_argument('-x', "--http_host", default="::",
         help='my host, defaults to "socket.gethostname()"')
     own_group.add_argument('-X', "--http_port", default=9000,
         type=int, help='my port, defaults to 9000')
@@ -442,16 +409,33 @@ def main():
     add_subscriber_group(a, "ekgplotter")
     args = finalize_arg_parser(a)
 
-    try:
-        host, port = socket.getaddrinfo(args.http_host, args.http_port, socket.AF_INET6, socket.SOCK_DGRAM, 0, socket.AI_V4MAPPED | socket.AI_ALL | socket.AI_CANONNAME)[-1][4][:2]
 
-        server = JustAHTTPServer(("0.0.0.0", 9000), MyHandler)
-        server.args = args
-        print "%s: starting up http server on '%s:%d'" % (
-            datetime.now().strftime("%x %X"), host, port)
+    http_host, http_port = resolve_host(args.http_host, args.http_port)
+    print http_host, http_port
+
+    server = JustAHTTPServer((http_host, http_port), MyHandler)
+    server.args = args
+    print "%s: starting up http server on '%s:%d'" % (
+        datetime.now().strftime("%x %X"), http_host, http_port)
+
+    print "before start:"
+    #objgraph.show_growth()
+    try:
         server.serve_forever()
     except KeyboardInterrupt:
         print '^C received, shutting down server'
+        #print "queue size", queue.qsize()
+        #print "show growth", objgraph.show_growth()
+        #import random
+        #objgraph.show_chain(
+            #objgraph.find_backref_chain(
+                #random.choice(objgraph.by_type('function')),
+                #objgraph.is_proper_module),
+            #filename='chain.png')
+        #roots = objgraph.get_leaking_objects()
+        #print "root", len(roots)
+        #objgraph.show_most_common_types(objects=roots)
+        #objgraph.show_refs(roots[:3], refcounts=True, filename='roots.png')
         server.socket.close()
 
 
