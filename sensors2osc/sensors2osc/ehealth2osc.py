@@ -21,7 +21,7 @@
 from __future__ import absolute_import
 
 from sensors2osc.common import *
-import time
+import time, select
 
 
 def main():
@@ -31,7 +31,11 @@ def main():
 
     while 1:
         try:
-            data = platform.serial_sock.readline()[:-2]
+            toread, towrite, toerrors = select.select([platform.serial_sock], [],[], 0.05)
+            if toread:
+                data = platform.serial_sock.readline()[:-2]
+            else:
+                continue
             #print repr(data)
         except socket.error, msg:
             # got disconnected?

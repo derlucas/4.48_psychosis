@@ -70,8 +70,12 @@ def main():
 
     while 1:
         try:
-            t = platform.serial_sock.read(1)
-        except socket.error, msg:
+            toread, towrite, toerrors = select.select([platform.serial_sock], [],[], 0.05)
+            if toread:
+                t = platform.serial_sock.read(1)
+            else:
+                continue
+        except socket.error as msg:
             # got disconnected?
             print "serial socket error!!!", msg
             platform.reconnect()

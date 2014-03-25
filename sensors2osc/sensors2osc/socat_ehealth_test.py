@@ -32,4 +32,4 @@ serial_sock.open()
 
 while 1:
     serial_sock.write("%d;%d;%d\r\n" % (random.randint(0,1023), random.randint(0,1023), random.randint(0,1023)))
-    time.sleep(0.1)
+    time.sleep(0.05)

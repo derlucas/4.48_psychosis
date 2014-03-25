@@ -20,7 +20,7 @@
 
 from __future__ import absolute_import
 
-import time
+import time, select
 
 from sensors2osc.common import *
 
@@ -33,8 +33,12 @@ def main():
 
     while 1:
         try:
-            t = platform.serial_sock.read(1)
-        except socket.error, msg:
+            toread, towrite, toerrors = select.select([platform.serial_sock], [],[], 0.05)
+            if toread:
+                t = platform.serial_sock.read(1)
+            else:
+                continue
+        except socket.error as msg:
             # got disconnected?
             print "serial socket error!!!", msg
             platform.reconnect()
@@ -52,6 +56,8 @@ def main():
         except socket.error, msg:
             print "cannot connect to chaosc"
             continue
+
+
 
 
 if __name__ == '__main__':
