@@ -25,13 +25,15 @@
 from __future__ import absolute_import
 
 
-#import objgraph
-
 from  datetime import datetime
 import threading
 import Queue
+import traceback
 import numpy as np
-import string,cgi,time, random, socket
+import string
+import time
+import random
+import socket
 from os import curdir, sep
 from BaseHTTPServer import BaseHTTPRequestHandler, HTTPServer
 from SocketServer import ThreadingMixIn, ForkingMixIn
@@ -51,14 +53,13 @@ from pyqtgraph.widgets.PlotWidget import PlotWidget
 from chaosc.argparser_groups import *
 from chaosc.lib import resolve_host
 
-#try:
-    #from chaosc.c_osc_lib import *
-#except ImportError:
-from chaosc.osc_lib import *
+try:
+    from chaosc.c_osc_lib import *
+except ImportError:
+    from chaosc.osc_lib import *
 
 QtGui.QApplication.setGraphicsSystem('opengl')
 
-print "systemInfo", pg.systemInfo()
 
 try:
     from chaosc.c_osc_lib import decode_osc
@@ -80,16 +81,18 @@ class PlotWindow(PlotWidget):
             self.win.setWindowTitle(title)
 
 
+
 class OSCThread(threading.Thread):
     def __init__(self, args):
         super(OSCThread, self).__init__()
         self.args = args
         self.running = True
-        self.own_address = socket.getaddrinfo(args.own_host, args.own_port, socket.AF_INET6, socket.SOCK_DGRAM, 0, socket.AI_V4MAPPED | socket.AI_ALL | socket.AI_CANONNAME)[-1][4][:2]
 
-        self.chaosc_address = chaosc_host, chaosc_port = socket.getaddrinfo(args.chaosc_host, args.chaosc_port, socket.AF_INET6, socket.SOCK_DGRAM, 0, socket.AI_V4MAPPED | socket.AI_ALL | socket.AI_CANONNAME)[-1][4][:2]
+        self.own_address = resolve_host(args.own_host, args.own_port, args.address_family)
 
-        self.osc_sock = socket.socket(10, 2, 17)
+        self.chaosc_address = chaosc_host, chaosc_port = resolve_host(args.chaosc_host, args.chaosc_port, args.address_family)
+
+        self.osc_sock = socket.socket(args.address_family, 2, 17)
         self.osc_sock.bind(self.own_address)
         self.osc_sock.setblocking(0)
 
@@ -136,7 +139,7 @@ class OSCThread(threading.Thread):
         while self.running:
             reads, writes, errs = select.select([self.osc_sock], [], [], 0.05)
             if reads:
-                osc_input = reads[0].recv(4096)
+                osc_input = reads[0].recv(128)
                 osc_address, typetags, messages = decode_osc(osc_input, 0, len(osc_input))
                 #print "thread osc_address", osc_address
                 if osc_address.find("ekg") > -1 or osc_address.find("plot") != -1:
@@ -231,7 +234,6 @@ class Actor(object):
 
 class EkgPlot(object):
     def __init__(self, actor_names, num_data, colors):
-
         self.plot = pg.PlotWidget(title="<h1>EKG</h1>")
         self.plot.hide()
         self.plot.setLabel('left', "<h2>Amplitude</h2>")
@@ -279,24 +281,31 @@ class EkgPlot(object):
 
     def update(self, osc_address, value):
 
+        print "update", osc_address
         res = self.ekg_regex.match(osc_address)
         if res:
+            #print("matched data")
             actor_name = res.group(1)
             actor_obj = self.actors[actor_name]
             max_actors = len(self.active_actors)
-            ix = self.active_actors.index(actor_obj)
             actor_data = actor_obj.data
             data_pointer = actor_obj.data_pointer
             actor_data[data_pointer] = value
-            actor_obj.set_point(value, ix, max_actors)
+            try:
+                ix = self.active_actors.index(actor_obj)
+                actor_obj.set_point(value, ix, max_actors)
+                actor_obj.plotItem.setData(y=np.array(actor_obj.scale_data(ix, max_actors)), clear=True)
+            except ValueError as e:
+                #print("data", e)
+                pass
             actor_obj.data_pointer = (data_pointer + 1) % self.num_data
-            actor_obj.plotItem.setData(y=np.array(actor_obj.scale_data(ix, max_actors)), clear=True)
             return
 
         res = self.ctl_regex.match(osc_address)
         if res:
             actor_name = res.group(1)
             actor_obj = self.actors[actor_name]
+            #print("matched ctl", value, actor_name, actor_obj.active)
             if value == 1 and not actor_obj.active:
                 print "actor on", actor_name
                 self.plot.addItem(actor_obj)
@@ -306,7 +315,22 @@ class EkgPlot(object):
                 print "actor off", actor_name
                 self.plot.removeItem(actor_obj)
                 actor_obj.active = True
-                self.active_actors.remove(actor_obj)
+                if actor_obj not in self.active_actors:
+                    self.plot.addItem(actor_obj.plotItem)
+                    self.plot.addItem(actor_obj.plotPoint)
+                    self.active_actors.append(actor_obj)
+                assert actor_obj in self.active_actors
+            elif value == 0 and actor_obj.active:
+                #print("actor off", actor_name, actor_obj, self.active_actors)
+                actor_obj.active = False
+                self.plot.removeItem(actor_obj.plotItem)
+                self.plot.removeItem(actor_obj.plotPoint)
+                try:
+                    self.active_actors.remove(actor_obj)
+                except ValueError as e:
+                    #print("ctl", e)
+                    pass
+                assert actor_obj not in self.active_actors
 
             self.set_positions()
 
@@ -361,8 +385,10 @@ class MyHandler(BaseHTTPRequestHandler):
                     buffer = QBuffer()
                     buffer.open(QIODevice.WriteOnly)
                     img.save(buffer, "JPG", 100)
+
                     JpegData = buffer.data()
                     self.wfile.write("--aaboundary\r\nContent-Type: image/jpeg\r\nContent-length: %d\r\n\r\n%s\r\n\r\n\r\n" % (len(JpegData), JpegData))
+
                     del JpegData
                     del buffer
                     del img
@@ -389,54 +415,47 @@ class MyHandler(BaseHTTPRequestHandler):
             print "queue size", queue.qsize()
             thread.running = False
             thread.join()
-        except IOError:
+        except IOError, e:
+            print "ioerror", e
+            print '-'*40
+            print 'Exception happened during processing of request from'
+            traceback.print_exc() # XXX But this goes to stderr!
+            print '-'*40
             self.send_error(404,'File Not Found: %s' % self.path)
 
 
 class JustAHTTPServer(HTTPServer):
-    address_family = socket.AF_INET6
     pass
 
 
 def main():
-    a = create_arg_parser("ekgplotter")
-    own_group = add_main_group(a)
+    arg_parser = create_arg_parser("ekgplotter")
+    own_group = add_main_group(arg_parser)
     own_group.add_argument('-x', "--http_host", default="::",
-        help='my host, defaults to "socket.gethostname()"')
+        help='my host, defaults to "::"')
     own_group.add_argument('-X', "--http_port", default=9000,
         type=int, help='my port, defaults to 9000')
-    add_chaosc_group(a)
-    add_subscriber_group(a, "ekgplotter")
-    args = finalize_arg_parser(a)
+    add_chaosc_group(arg_parser)
+    add_subscriber_group(arg_parser, "ekgplotter")
+    args = finalize_arg_parser(arg_parser)
 
+    qtapp = QtGui.QApplication([])
 
-    http_host, http_port = resolve_host(args.http_host, args.http_port)
-    print http_host, http_port
+    http_host, http_port = resolve_host(args.http_host, args.http_port, args.address_family)
 
     server = JustAHTTPServer((http_host, http_port), MyHandler)
+    server.address_family = args.address_family
     server.args = args
     print "%s: starting up http server on '%s:%d'" % (
         datetime.now().strftime("%x %X"), http_host, http_port)
 
-    print "before start:"
-    #objgraph.show_growth()
     try:
         server.serve_forever()
     except KeyboardInterrupt:
         print '^C received, shutting down server'
-        #print "queue size", queue.qsize()
-        #print "show growth", objgraph.show_growth()
-        #import random
-        #objgraph.show_chain(
-            #objgraph.find_backref_chain(
-                #random.choice(objgraph.by_type('function')),
-                #objgraph.is_proper_module),
-            #filename='chain.png')
-        #roots = objgraph.get_leaking_objects()
-        #print "root", len(roots)
-        #objgraph.show_most_common_types(objects=roots)
-        #objgraph.show_refs(roots[:3], refcounts=True, filename='roots.png')
         server.socket.close()
+        sys.exit(0)
+
 
 
 if __name__ == '__main__':
