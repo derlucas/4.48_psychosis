@@ -25,7 +25,8 @@ import os.path
 import serial
 import socket
 
-from chaosc.argparser_groups import *
+from chaosc.argparser_groups import create_arg_parser, finalize_arg_parser, add_chaosc_group
+
 
 try:
     from chaosc.c_osc_lib import OSCMessage
@@ -38,7 +39,7 @@ class Platform(object):
     def __init__(self, args):
         self.args = args
         self.serial_sock = None
-        self.osc_sock = socket.socket(10, 2, 17)
+        self.osc_sock = socket.socket(args.address_family, 2, 17)
         self.osc_sock.connect((self.args.chaosc_host, self.args.chaosc_port))
 
 
@@ -76,6 +77,8 @@ def create_args(name):
         type=str, help='device node under /dev')
     main_group.add_argument("-a", '--actor', required=True,
         type=str, help='actor name')
+    main_group.add_argument('-4', '--ipv4_only', action="store_true",
+        help='select ipv4 sockets, defaults tp ipv6"')
     add_chaosc_group(arg_parser)
 
     args = finalize_arg_parser(arg_parser)
