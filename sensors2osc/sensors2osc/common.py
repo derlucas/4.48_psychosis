@@ -45,17 +45,15 @@ class Platform(object):
 
     def connect(self):
         print "connect serial"
-        self.serial_sock = serial.Serial()
-        self.serial_sock.port = self.args.device
-        self.serial_sock.baudrate = 115200
-        self.serial_sock.timeout = 0
         print "waiting for the device %r to come up" % self.args.device
         while 1:
             try:
-                self.serial_sock.open()
-                break
-            except serial.serialtuil.SerialException:
+                self.serial_sock = serial.Serial(self.args.device, 115200, timeout=1)
+            except serial.serialutil.SerialException, e:
+                print "serial error", e
                 pass
+            else:
+                break
 
 
     def close(self):

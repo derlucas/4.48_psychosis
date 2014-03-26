@@ -42,7 +42,7 @@ def main():
             print "serial socket error!!!", msg
             platform.reconnect()
 
-        #print "got data", repr(data)
+        print "got data", repr(data)
         try:
             airFlow, emg, temp = data.split(";")
         except ValueError, e:

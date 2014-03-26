@@ -20,7 +20,7 @@
 
 from __future__ import absolute_import
 
-import time
+import time, select
 from datetime import datetime
 
 from sensors2osc.common import *
