@@ -44,7 +44,7 @@ from collections import deque
 
 
 from PyQt4.QtCore import QBuffer, QByteArray, QIODevice
-from PyQt4 import QtGui
+from PyQt4 import QtGui, QtCore
 
 import pyqtgraph as pg
 
@@ -58,7 +58,6 @@ try:
 except ImportError:
     from chaosc.osc_lib import *
 
-QtGui.QApplication.setGraphicsSystem('opengl')
 
 
 try:
@@ -67,7 +66,6 @@ except ImportError as e:
     print(e)
     from chaosc.osc_lib import decode_osc
 
-QAPP = QtGui.QApplication([])
 
 
 class PlotWindow(PlotWidget):
@@ -281,7 +279,7 @@ class EkgPlot(object):
 
     def update(self, osc_address, value):
 
-        print "update", osc_address
+        #print "update", osc_address
         res = self.ekg_regex.match(osc_address)
         if res:
             #print("matched data")
@@ -305,30 +303,21 @@ class EkgPlot(object):
         if res:
             actor_name = res.group(1)
             actor_obj = self.actors[actor_name]
-            #print("matched ctl", value, actor_name, actor_obj.active)
             if value == 1 and not actor_obj.active:
-                print "actor on", actor_name
-                self.plot.addItem(actor_obj)
+                #print "actor on", actor_name
+                self.plot.addItem(actor_obj.plotItem)
+                self.plot.addItem(actor_obj.plotPoint)
                 actor_obj.active = True
-                self.active_actors.append(actor_obj)
-            elif value == 0 and not actor_obj.active:
-                print "actor off", actor_name
-                self.plot.removeItem(actor_obj)
-                actor_obj.active = True
-                if actor_obj not in self.active_actors:
-                    self.plot.addItem(actor_obj.plotItem)
-                    self.plot.addItem(actor_obj.plotPoint)
+                if not actor_obj in self.active_actors:
                     self.active_actors.append(actor_obj)
-                assert actor_obj in self.active_actors
             elif value == 0 and actor_obj.active:
-                #print("actor off", actor_name, actor_obj, self.active_actors)
+                #print "actor off", actor_name
                 actor_obj.active = False
                 self.plot.removeItem(actor_obj.plotItem)
                 self.plot.removeItem(actor_obj.plotPoint)
                 try:
                     self.active_actors.remove(actor_obj)
                 except ValueError as e:
-                    #print("ctl", e)
                     pass
                 assert actor_obj not in self.active_actors
 
@@ -365,13 +354,17 @@ class MyHandler(BaseHTTPRequestHandler):
                 actor_names = ["bjoern", "merle", "uwe"]
                 num_data = 100
                 colors = ["r", "g", "b"]
+                qtapp = QtGui.QApplication([])
                 plotter = EkgPlot(actor_names, num_data, colors)
 
 
                 self.wfile.write("Content-Type: multipart/x-mixed-replace; boundary=--aaboundary\r\n\r\n")
                 #lastTime = time.time()
                 #fps = None
+                event_loop = QtCore.QEventLoop()
                 while 1:
+                    event_loop.processEvents()
+                    qtapp.sendPostedEvents(None, 0)
                     while 1:
                         try:
                             osc_address, args = queue.get_nowait()
@@ -438,8 +431,6 @@ def main():
     add_chaosc_group(arg_parser)
     add_subscriber_group(arg_parser, "ekgplotter")
     args = finalize_arg_parser(arg_parser)
-
-    qtapp = QtGui.QApplication([])
 
     http_host, http_port = resolve_host(args.http_host, args.http_port, args.address_family)
 
