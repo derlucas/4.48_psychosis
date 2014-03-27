@@ -336,8 +336,9 @@ class EkgPlot(object):
 class MyHandler(BaseHTTPRequestHandler):
 
     def __del__(self):
-        self.thread.running = False
-        self.thread.join()
+        if hasattr(self, "thread"):
+            self.thread.running = False
+            self.thread.join()
 
     def do_GET(self):
 
@@ -406,12 +407,12 @@ class MyHandler(BaseHTTPRequestHandler):
                     #print '%0.2f fps' % fps
 
             elif self.path.endswith(".jpeg"):
-                f = open(curdir + sep + self.path)
+                directory = os.path.dirname(os.path.abspath(__file__))
+                data = open(os.path.join(directory, self.path), "rb").read()
                 self.send_response(200)
                 self.send_header('Content-type','image/jpeg')
                 self.end_headers()
-                self.wfile.write(f.read())
-                f.close()
+                self.wfile.write(data)
             return
         except (KeyboardInterrupt, SystemError):
             print "queue size", queue.qsize()
