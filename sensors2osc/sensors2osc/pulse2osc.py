@@ -75,7 +75,7 @@ def main():
                 t = platform.serial_sock.read(1)
             else:
                 continue
-        except socket.error as msg:
+        except (socket.error, serial.serialutil.SerialException), msg:
             # got disconnected?
             print "serial socket error!!!", msg
             platform.reconnect()

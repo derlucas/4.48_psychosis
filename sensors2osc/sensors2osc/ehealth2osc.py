@@ -37,7 +37,7 @@ def main():
             else:
                 continue
             #print repr(data)
-        except socket.error, msg:
+        except (socket.error, serial.serialutil.SerialException), msg:
             # got disconnected?
             print "serial socket error!!!", msg
             platform.reconnect()
