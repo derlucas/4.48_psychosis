@@ -34,6 +34,7 @@ import string
 import time
 import random
 import socket
+import os.path
 from os import curdir, sep
 from BaseHTTPServer import BaseHTTPRequestHandler, HTTPServer
 from SocketServer import ThreadingMixIn, ForkingMixIn
@@ -137,10 +138,10 @@ class OSCThread(threading.Thread):
         while self.running:
             reads, writes, errs = select.select([self.osc_sock], [], [], 0.05)
             if reads:
-                osc_input = reads[0].recv(128)
+                osc_input = self.osc_sock.recv(256)
                 osc_address, typetags, messages = decode_osc(osc_input, 0, len(osc_input))
                 #print "thread osc_address", osc_address
-                if osc_address.find("ekg") > -1 or osc_address.find("plot") != -1:
+                if osc_address.find("ekg") != -1 or osc_address.find("plot") != -1:
                     queue.put_nowait((osc_address, messages))
             else:
                 queue.put_nowait(("/bjoern/ekg", [0]))
@@ -164,7 +165,11 @@ class Actor(object):
         self.num_data = num_data
         #self.plotItem.setShadowPen(pen=Actor.shadowPen, width=3, cosmetic=True)
         self.plotPoint = pg.ScatterPlotItem(pen=Actor.shadowPen, brush=self.brush, size=5)
-
+    
+    def __str__(self):
+        return "<Actor name:%r, active=%r, position=%r>" % (self.name, self.active, self.data_pointer)
+    
+    __repr__ = __str__
 
     def scale_data(self, ix, max_items):
         scale = 255 / max_items * ix
@@ -301,25 +306,29 @@ class EkgPlot(object):
 
         res = self.ctl_regex.match(osc_address)
         if res:
+            print "received cmd", osc_address
             actor_name = res.group(1)
             actor_obj = self.actors[actor_name]
             if value == 1 and not actor_obj.active:
-                #print "actor on", actor_name
+                print "actor on", actor_name, self.active_actors
                 self.plot.addItem(actor_obj.plotItem)
                 self.plot.addItem(actor_obj.plotPoint)
                 actor_obj.active = True
                 if not actor_obj in self.active_actors:
                     self.active_actors.append(actor_obj)
             elif value == 0 and actor_obj.active:
-                #print "actor off", actor_name
+                print "actor off", actor_name, self.active_actors
                 actor_obj.active = False
                 self.plot.removeItem(actor_obj.plotItem)
                 self.plot.removeItem(actor_obj.plotPoint)
                 try:
                     self.active_actors.remove(actor_obj)
                 except ValueError as e:
+                    print "active actors error", e, self.active_actors
                     pass
                 assert actor_obj not in self.active_actors
+            else:
+                print "internal data not in sync", self.active_actors, actor_obj
 
             self.set_positions()
 
@@ -339,12 +348,12 @@ class MyHandler(BaseHTTPRequestHandler):
 
 
             if self.path.endswith(".html"):
-                f = open(curdir + sep + self.path)
+                directory = os.path.dirname(os.path.abspath(__file__))
+                data = open(os.path.join(directory, self.path), "rb").read()
                 self.send_response(200)
                 self.send_header('Content-type',    'text/html')
                 self.end_headers()
-                self.wfile.write(f.read())
-                f.close()
+                self.wfile.write(data)
             elif self.path.endswith(".mjpeg"):
                 self.thread = thread = OSCThread(self.server.args)
                 thread.daemon = True
