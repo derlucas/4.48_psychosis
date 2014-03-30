@@ -24,6 +24,7 @@ import atexit
 import os.path
 import serial
 import socket
+import time
 
 from chaosc.argparser_groups import create_arg_parser, finalize_arg_parser, add_chaosc_group
 
@@ -46,11 +47,16 @@ class Platform(object):
     def connect(self):
         print "connect serial"
         print "waiting for the device %r to come up" % self.args.device
+        self.serial_sock = serial.Serial()
+        self.serial_sock.port = self.args.device
+        self.serial_sock.baudrate = 115200
+        self.serial_sock.timeout = 1
         while 1:
             try:
-                self.serial_sock = serial.Serial(self.args.device, 115200, timeout=1)
-            except serial.serialutil.SerialException, e:
+                self.serial_sock.open()
+            except (serial.serialutil.SerialException, os.error), e:
                 print "serial error", e
+                time.sleep(0.5)
                 pass
             else:
                 break
