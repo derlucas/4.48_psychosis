@@ -165,10 +165,10 @@ class Actor(object):
         self.num_data = num_data
         #self.plotItem.setShadowPen(pen=Actor.shadowPen, width=3, cosmetic=True)
         self.plotPoint = pg.ScatterPlotItem(pen=Actor.shadowPen, brush=self.brush, size=5)
-    
+
     def __str__(self):
         return "<Actor name:%r, active=%r, position=%r>" % (self.name, self.active, self.data_pointer)
-    
+
     __repr__ = __str__
 
     def scale_data(self, ix, max_items):
@@ -335,11 +335,6 @@ class EkgPlot(object):
 
 class MyHandler(BaseHTTPRequestHandler):
 
-    def __del__(self):
-        if hasattr(self, "thread"):
-            self.thread.running = False
-            self.thread.join()
-
     def do_GET(self):
 
         try:
@@ -352,23 +347,22 @@ class MyHandler(BaseHTTPRequestHandler):
                 directory = os.path.dirname(os.path.abspath(__file__))
                 data = open(os.path.join(directory, self.path), "rb").read()
                 self.send_response(200)
-                self.send_header('Content-type',    'text/html')
+                self.send_header('Content-type', 'text/html')
                 self.end_headers()
                 self.wfile.write(data)
             elif self.path.endswith(".mjpeg"):
                 self.thread = thread = OSCThread(self.server.args)
                 thread.daemon = True
                 thread.start()
-
-                self.send_response(200)
                 actor_names = ["bjoern", "merle", "uwe"]
                 num_data = 100
                 colors = ["r", "g", "b"]
                 qtapp = QtGui.QApplication([])
                 plotter = EkgPlot(actor_names, num_data, colors)
 
-
-                self.wfile.write("Content-Type: multipart/x-mixed-replace; boundary=--aaboundary\r\n\r\n")
+                self.send_response(200)
+                self.send_header("Content-Type", "multipart/x-mixed-replace; boundary=--aaboundary")
+                self.end_headers()
                 #lastTime = time.time()
                 #fps = None
                 event_loop = QtCore.QEventLoop()
@@ -432,15 +426,15 @@ class JustAHTTPServer(HTTPServer):
 
 
 def main():
-    arg_parser = create_arg_parser("ekgplotter")
-    own_group = add_main_group(arg_parser)
-    own_group.add_argument('-x', "--http_host", default="::",
+    arg_parser = ArgParser("ekgplotter")
+    own_group = arg_parser.add_main_group()
+    arg_parser.add_argument(own_group, '-x', "--http_host", default="::",
         help='my host, defaults to "::"')
-    own_group.add_argument('-X', "--http_port", default=9000,
+    arg_parser.add_argument(own_group, '-X', "--http_port", default=9000,
         type=int, help='my port, defaults to 9000')
-    add_chaosc_group(arg_parser)
-    add_subscriber_group(arg_parser, "ekgplotter")
-    args = finalize_arg_parser(arg_parser)
+    arg_parser.add_chaosc_group()
+    add_subscriber_group()
+    args = arg_parser.finalize()
 
     http_host, http_port = resolve_host(args.http_host, args.http_port, args.address_family)
 

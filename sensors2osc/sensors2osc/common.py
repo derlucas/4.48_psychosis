@@ -26,7 +26,7 @@ import serial
 import socket
 import time
 
-from chaosc.argparser_groups import create_arg_parser, finalize_arg_parser, add_chaosc_group
+from chaosc.argparser_groups import ArgParser
 
 
 try:
@@ -75,17 +75,18 @@ class Platform(object):
 
 
 def create_args(name):
-    arg_parser = create_arg_parser(name)
+    arg_parser = ArgParser(name)
+    arg_parser.add_global_group()
     main_group = arg_parser.add_argument_group("main")
-    main_group.add_argument("-d", '--device', required=True,
+    arg_parser.add_argument(main_group, "-D", '--device', required=True,
         type=str, help='device node under /dev')
-    main_group.add_argument("-a", '--actor', required=True,
+    arg_parser.add_argument(main_group, "-a", '--actor', required=True,
         type=str, help='actor name')
-    main_group.add_argument('-4', '--ipv4_only', action="store_true",
-        help='select ipv4 sockets, defaults tp ipv6"')
-    add_chaosc_group(arg_parser)
+    arg_parser.add_argument(main_group, '-b', '--baudrate', type=int, default=115200, choices=sorted(serial.baudrate_constants.keys()),
+        help='selects the baudrate, default=115200, for valid values execute "import serial;print sorted(serial.baudrate_constants.keys())"')
+    arg_parser.add_chaosc_group()
 
-    args = finalize_arg_parser(arg_parser)
+    args = arg_parser.finalize()
     return args
 
 
