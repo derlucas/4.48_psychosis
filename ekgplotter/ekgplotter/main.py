@@ -87,16 +87,16 @@ class OSCThread(threading.Thread):
         self.args = args
         self.running = True
 
-        self.own_address = resolve_host(args.own_host, args.own_port, args.address_family)
+        self.client_address = resolve_host(args.client_host, args.client_port, args.address_family)
 
         self.chaosc_address = chaosc_host, chaosc_port = resolve_host(args.chaosc_host, args.chaosc_port, args.address_family)
 
         self.osc_sock = socket.socket(args.address_family, 2, 17)
-        self.osc_sock.bind(self.own_address)
+        self.osc_sock.bind(self.client_address)
         self.osc_sock.setblocking(0)
 
         print "%s: starting up osc receiver on '%s:%d'" % (
-            datetime.now().strftime("%x %X"), self.own_address[0], self.own_address[1])
+            datetime.now().strftime("%x %X"), self.client_address[0], self.client_address[1])
 
         self.subscribe_me()
 
@@ -114,8 +114,8 @@ class OSCThread(threading.Thread):
         """
         print "%s: subscribing to '%s:%d' with label %r" % (datetime.now().strftime("%x %X"), self.chaosc_address[0], self.chaosc_address[1], self.args.subscriber_label)
         msg = OSCMessage("/subscribe")
-        msg.appendTypedArg(self.own_address[0], "s")
-        msg.appendTypedArg(self.own_address[1], "i")
+        msg.appendTypedArg(self.client_address[0], "s")
+        msg.appendTypedArg(self.client_address[1], "i")
         msg.appendTypedArg(self.args.authenticate, "s")
         if self.args.subscriber_label is not None:
             msg.appendTypedArg(self.args.subscriber_label, "s")
@@ -128,8 +128,8 @@ class OSCThread(threading.Thread):
 
         print "%s: unsubscribing from '%s:%d'" % (datetime.now().strftime("%x %X"), self.chaosc_address[0], self.chaosc_address[1])
         msg = OSCMessage("/unsubscribe")
-        msg.appendTypedArg(self.own_address[0], "s")
-        msg.appendTypedArg(self.own_address[1], "i")
+        msg.appendTypedArg(self.client_address[0], "s")
+        msg.appendTypedArg(self.client_address[1], "i")
         msg.appendTypedArg(self.args.authenticate, "s")
         self.osc_sock.sendto(msg.encode_osc(), self.chaosc_address)
 
@@ -410,9 +410,15 @@ class MyHandler(BaseHTTPRequestHandler):
             return
         except (KeyboardInterrupt, SystemError):
             print "queue size", queue.qsize()
-            thread.running = False
-            thread.join()
+            if hasattr(self, "thread"):
+                self.thread.running = False
+                self.thread.join()
+                del self.thread
         except IOError, e:
+            if hasattr(self, "thread"):
+                self.thread.running = False
+                self.thread.join()
+                del self.thread
             print "ioerror", e
             print '-'*40
             print 'Exception happened during processing of request from'
@@ -427,13 +433,14 @@ class JustAHTTPServer(HTTPServer):
 
 def main():
     arg_parser = ArgParser("ekgplotter")
-    own_group = arg_parser.add_main_group()
-    arg_parser.add_argument(own_group, '-x', "--http_host", default="::",
+    arg_parser.add_global_group()
+    client_group = arg_parser.add_client_group()
+    arg_parser.add_argument(client_group, '-x', "--http_host", default="::",
         help='my host, defaults to "::"')
-    arg_parser.add_argument(own_group, '-X', "--http_port", default=9000,
+    arg_parser.add_argument(client_group, '-X', "--http_port", default=9000,
         type=int, help='my port, defaults to 9000')
     arg_parser.add_chaosc_group()
-    add_subscriber_group()
+    arg_parser.add_subscriber_group()
     args = arg_parser.finalize()
 
     http_host, http_port = resolve_host(args.http_host, args.http_port, args.address_family)
