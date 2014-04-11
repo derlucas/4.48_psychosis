@@ -17,25 +17,26 @@ class MainWindow(MainWindowBase, MainWindowForm):
 
         # setup the ui
         self.setupUi(self)
-        self.show_private_text.setRichTextSupport(KRichTextWidget.RichTextSupport(0xffffffff))
+        #self.show_public_text.setRichTextSupport(KRichTextWidget.RichTextSupport(0xffffffff))
         self.edit_private_text.setRichTextSupport(KRichTextWidget.RichTextSupport(0xffffffff))
         self.edit_action_collection = KActionCollection(self)
         self.edit_private_text.createActions(self.edit_action_collection)
         for action in self.edit_action_collection.actions():
             self.toolBar.addAction(action)
 
-
-        print dir(self)
-
+        self.current_text = None
+        self.current_title = None
+        self.current_index = None
+        self.is_published = False
 
         self.tabWidget.currentChanged.connect(self.slot_toggleToolbox)
         self.add_button.clicked.connect(self.slot_addText)
         self.save_button.clicked.connect(self.slot_save)
-        self.publish_button.clicked.connect(self.slot_publish)
-        self.clear_button.clicked.connect(self.slot_clear)
+        self.publish_button.toggled.connect(self.slot_toggle_publish)
         self.remove_item_button.clicked.connect(self.slot_removeItem)
         self.edit_item_selection.activated.connect(self.slot_editLoadItem)
         self.item_list.currentRowChanged.connect(self.slot_showLoadItem)
+        self.auto_publish_checkbox.toggled.connect(self.slot_toggle_publish)
 
         self.items = dict()
         self.slot_load()
@@ -45,8 +46,10 @@ class MainWindow(MainWindowBase, MainWindowForm):
         self.previous_button.setShortcut(QtGui.QKeySequence(QtCore.Qt.Key_Backspace))
         self.previous_button.clicked.connect(self.slot_previous_item)
 
+
     def slot_next_item(self):
         print "slot_next_item"
+        print "current_title", self.current_title, self.current_text
         index = (self.item_list.currentRow() + 1) % self.item_list.count()
         self.item_list.setCurrentRow(index)
         self.edit_item_selection.setCurrentIndex(index)
@@ -55,6 +58,7 @@ class MainWindow(MainWindowBase, MainWindowForm):
 
     def slot_previous_item(self):
         print "slot_previous_item"
+        print "current_title", self.current_title, self.current_text
         index = (self.item_list.currentRow() - 1) % self.item_list.count()
         self.item_list.setCurrentRow(index)
         self.edit_item_selection.setCurrentIndex(index)
@@ -62,6 +66,8 @@ class MainWindow(MainWindowBase, MainWindowForm):
         self.slot_showLoadItem(index)
 
     def slot_toggleToolbox(self, index):
+        print "slot_toggleToolbox"
+        print "current_title", self.current_title, self.current_text
         if index == 0:
             self.toolBar.setEnabled(True)
         else:
@@ -74,10 +80,30 @@ class MainWindow(MainWindowBase, MainWindowForm):
         #animation.setEndValue(QRect(250, 250, 100, 30));
         #animation.start();
         print "slot_publish"
-        self.show_public_text.setTextOrHtml(self.show_private_text.textOrHtml())
+        print "current_title", self.current_title, self.current_text
+        self.show_public_text.setTextOrHtml(self.current_text)
+        self.is_published = True
+
+    def slot_toggle_publish(self, state=None):
+        #QPropertyAnimation animation(self.public_text.palette(), "geometry");
+        #animation.setDuration(10000);
+        #animation.setStartValue(QRect(0, 0, 100, 30));
+        #animation.setEndValue(QRect(250, 250, 100, 30));
+        #animation.start();
+        print "slot_toggle_publish", state
+        print "current_title", self.current_title, self.current_text
+
+        if state:
+            self.slot_publish()
+        else:
+            self.slot_clear()
 
     def slot_clear(self):
+        print "slot_clear"
+        print "current_title", self.current_title, self.current_text
+
         self.show_public_text.clear()
+        self.is_published = False
 
     def slot_removeItem(self):
         text = self.edit_item_selection.currentText()
@@ -85,7 +111,14 @@ class MainWindow(MainWindowBase, MainWindowForm):
         title = text.split(": ")[1]
         del self.items[title]
         self.edit_item_selection.removeItem(index)
-        self.show_item_selection.removeItem(index)
+        self.item_list.removeItemWidget(self.item_list.item(index))
+        new_index = self.edit_item_selection.currentIndex()
+        if new_index != -1:
+            self.slot_editLoadItem()
+        else:
+            self.item_title.clear()
+            self.item_position_input.setValue(0)
+
 
     def slot_editLoadItem(self, index):
         print "slot_editLoadItem", index
@@ -99,15 +132,17 @@ class MainWindow(MainWindowBase, MainWindowForm):
     def slot_showLoadItem(self, index):
         public_rect = self.show_public_text.geometry()
         global_rect = QtCore.QRect(self.mapToGlobal(public_rect.topLeft()), self.mapToGlobal(public_rect.bottomRight()))
-        print "slot_showLoadItem", global_rect
+        print "slot_showLoadItem", global_rect, index
+        print "current_title", self.current_title, self.current_text
         item = self.item_list.item(index)
+        print "item", item
         if item is None:
             return
-        title = item.text()
-        text, index = self.items[title]
-        self.show_private_text.setHtml(text)
+        self.current_title = item.text()
+        self.current_text, self.current_index = self.items[self.current_title]
+        print "current_title", self.current_title, self.current_text
         if self.auto_publish_checkbox.isChecked():
-            self.show_public_text.setHtml(text)
+            self.show_public_text.setHtml(self.current_text)
 
     def title_by_index(self, ix):
         for title, (text, index) in self.items.iteritems():
@@ -169,11 +204,11 @@ class MainWindow(MainWindowBase, MainWindowForm):
 
         self.edit_item_selection.setCurrentIndex(0)
         self.item_list.setCurrentRow(0)
-        title, text, position = data[0]
-        self.edit_private_text.setTextOrHtml(text)
-        self.show_private_text.setTextOrHtml(text)
-        self.item_position_input.setValue(position)
-        self.item_title.setText(title)
+        self.current_title, self.current_text, self.current_index = data[0]
+
+        self.edit_private_text.setTextOrHtml(self.current_text)
+        self.item_position_input.setValue(self.current_index)
+        self.item_title.setText(self.current_title)
 
 
 
