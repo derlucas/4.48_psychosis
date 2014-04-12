@@ -49,14 +49,14 @@ class RingBuffer(object):
                 self.reset()
                 self.ring_buf[0] = 0
                 self.head = 1
-                raise ValueError("not complete - ringbuffer resettet")
+                raise ValueError("not complete - reset ringbuffer")
             data.append(value)
         if data[0] != 0x0 or data[1] != 0xff:
             print "issue", data
             self.reset()
             self.ring_buf[0] = 0
             self.head = 1
-            raise ValueError("not synced - ringbuffer resettet")
+            raise ValueError("not synced - reset ringbuffer")
         return data[2:]
 
 
@@ -85,7 +85,7 @@ def main():
         except TypeError, e:
             continue
 
-        print "got value", t
+        #print "got value", t
         buf.append(t)
 
         if t == 0:
