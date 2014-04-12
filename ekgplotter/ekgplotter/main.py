@@ -136,7 +136,10 @@ class OSCThread(threading.Thread):
     def run(self):
 
         while self.running:
-            reads, writes, errs = select.select([self.osc_sock], [], [], 0.05)
+            try:
+                reads, writes, errs = select.select([self.osc_sock], [], [], 0.05)
+            except select.error:
+                pass
             if reads:
                 osc_input = self.osc_sock.recv(256)
                 osc_address, typetags, messages = decode_osc(osc_input, 0, len(osc_input))
@@ -237,11 +240,11 @@ class Actor(object):
 
 class EkgPlot(object):
     def __init__(self, actor_names, num_data, colors):
-        self.plot = pg.PlotWidget(title="<h1>EKG</h1>")
+        self.plot = pg.PlotWidget()
         self.plot.hide()
-        self.plot.setLabel('left', "<h2>Amplitude</h2>")
-        self.plot.setLabel('bottom', "<h2><sup>Time</sup></h2>")
-        self.plot.showGrid(True, True)
+        #self.plot.setLabel('left', "<h2>Amplitude</h2>")
+        #self.plot.setLabel('bottom', "<h2><sup>Time</sup></h2>")
+        self.plot.showGrid(False, False)
         self.plot.setYRange(0, 255)
         self.plot.setXRange(0, num_data)
         self.plot.resize(1280, 720)
@@ -354,7 +357,7 @@ class MyHandler(BaseHTTPRequestHandler):
                 self.thread = thread = OSCThread(self.server.args)
                 thread.daemon = True
                 thread.start()
-                actor_names = ["bjoern", "merle", "uwe"]
+                actor_names = ["merle", "bjoern", "uwe"]
                 num_data = 100
                 colors = ["r", "g", "b"]
                 qtapp = QtGui.QApplication([])
