@@ -8,12 +8,52 @@ from PyQt4 import QtCore, QtGui
 from PyKDE4.kdeui import KActionCollection, KRichTextWidget
 
 from texter_ui import Ui_MainWindow
-
+from text_sorter_ui import Ui_text_sorter_dialog
 
 from operator import itemgetter
 import cPickle
 
 app = QtGui.QApplication([])
+
+
+class TextSorterDialog(QtGui.QDialog, Ui_text_sorter_dialog):
+    def __init__(self, parent = None):
+        super(TextSorterDialog, self).__init__(parent)
+
+        # setup the ui
+        self.setupUi(self)
+        self.fill_list()
+        
+        self.text_list.listView().clicked.connect(self.slot_show_text)
+        self.accepted.connect(self.slot_saveToDb)
+    
+    def fill_list(self):
+        for preview, text in self.parent().text_db:
+            self.text_list.insertItem(preview)
+    
+    def slot_text_up(self):
+        pass
+    
+    def slot_text_down(self):
+        pass
+    
+    def slot_show_text(self, model_index):
+        self.text_preview.setTextOrHtml(self.parent().text_db[model_index.row()][1])
+    
+    def slot_saveToDb(self):
+        data = list()
+        def findInDb(title):
+            for preview, text in self.parent().text_db:
+                if title == preview:
+                    return text
+            return None
+                
+        for i in self.text_list.items():
+            text = findInDb(i)
+            data.append((i, text))
+        self.parent().text_db = data   
+        print self.parent().text_db
+
 
 class MainWindow(QtGui.QMainWindow, Ui_MainWindow):
     def __init__(self, parent = None):
@@ -53,6 +93,7 @@ class MainWindow(QtGui.QMainWindow, Ui_MainWindow):
         self.show()
 
         self.is_published = False
+        self.current = 0
 
         #self.add_button.clicked.connect(self.slot_addText)
         #self.save_button.clicked.connect(self.slot_save)
@@ -63,15 +104,18 @@ class MainWindow(QtGui.QMainWindow, Ui_MainWindow):
         #self.edit_item_selection.activated.connect(self.slot_editLoadItem)
         #self.auto_publish_checkbox.clicked.connect(self.slot_publish)
         app.focusChanged.connect(self.focusChanged)
+        self.text_open_button.clicked.connect(self.slot_open_dialog)
+        self.live_save_button.clicked.connect(self.slot_save_live)
+        self.preview_save_button.clicked.connect(self.slot_save_preview)
 
 
-        self.items = dict()
+        self.text_db = list()
         #self.slot_load()
-        #self.next_button.setShortcut(QtGui.QKeySequence(QtCore.Qt.Key_Space))
-        #self.next_button.clicked.connect(self.slot_next_item)
+        self.next_button.setShortcut(QtGui.QKeySequence(QtCore.Qt.Key_Space))
+        self.next_button.clicked.connect(self.slot_next_item)
 
-        #self.previous_button.setShortcut(QtGui.QKeySequence(QtCore.Qt.Key_Backspace))
-        #self.previous_button.clicked.connect(self.slot_previous_item)
+        self.previous_button.setShortcut(QtGui.QKeySequence(QtCore.Qt.Key_Backspace))
+        self.previous_button.clicked.connect(self.slot_previous_item)
         public_rect = self.live_text.geometry()
         global_rect = QtCore.QRect(self.mapToGlobal(public_rect.topLeft()), self.mapToGlobal(public_rect.bottomRight()))
         self.statusBar().showMessage("geometry to cast: %d, %d, %d, %d" % (global_rect.x(), global_rect.y(), global_rect.width(), global_rect.height()))
@@ -111,20 +155,17 @@ class MainWindow(QtGui.QMainWindow, Ui_MainWindow):
     def slot_next_item(self):
         print "slot_next_item"
         #print "current_title", self.current_title, self.current_text
-        #index = (self.item_list.currentRow() + 1) % self.item_list.count()
-        #self.item_list.setCurrentRow(index)
-        #self.edit_item_selection.setCurrentIndex(index)
-        #self.slot_editLoadItem(index)
-        #self.slot_showLoadItem(index)
+        self.current = (self.current + 1) % len(self.text_db)
+        self.preview_text.setTextOrHtml(self.text_db[self.current][1])
+        print "current", self.current
 
     def slot_previous_item(self):
         print "slot_previous_item"
-        ##print "current_title", self.current_title, self.current_text
-        #index = (self.item_list.currentRow() - 1) % self.item_list.count()
-        #self.item_list.setCurrentRow(index)
-        #self.edit_item_selection.setCurrentIndex(index)
-        #self.slot_editLoadItem(index)
-        #self.slot_showLoadItem(index)
+        #print "current_title", self.current_title, self.current_text
+        self.current = (self.current - 1) % len(self.text_db)
+        self.preview_text.setTextOrHtml(self.text_db[self.current][1])
+        
+        print "current", self.current
 
     def slot_toggleToolbox(self, index):
         print "slot_toggleToolbox"
@@ -216,24 +257,27 @@ class MainWindow(QtGui.QMainWindow, Ui_MainWindow):
         self.item_title.setText(new_title)
         self.edit_item_selection.setItemText(index, "%d: %s" % (index, new_title))
 
-
-    def slot_addText(self):
-        print "slot add"
-        index = self.item_position_input.value()
-
-        old_title = self.title_by_index(index)
-        if old_title is not None:
-            self.slot_changeItem(old_title)
-            return
-
-        title = self.item_title.text()
+    def slot_save_live(self):
+        print "slot save live text"
+        text = self.live_text.toHtml()
+        preview = self.live_text.toPlainText()[:10]
+        print "represent", preview
+        self.text_db.append((preview, text))
+    
+    def slot_save_preview(self):
+        print "slot save live text"
         text = self.preview_text.toHtml()
-        self.items[title] = (text, index)
-        self.edit_item_selection.insertItem(index, "%d: %s" % (index, title))
-        self.edit_item_selection.setCurrentIndex(index)
+        preview = self.preview_text.toPlainText()[:10]
+        print "represent", preview
+        self.text_db.append((preview, text))
 
     def slot_save(self):
         cPickle.dump(self.items, open("448_texter.db", "w"), cPickle.HIGHEST_PROTOCOL)
+    
+    def slot_open_dialog(self):
+        self.dialog = TextSorterDialog(self)
+        print "modal", self.dialog.isModal()
+        self.dialog.open()
 
     def slot_load(self):
         try:
