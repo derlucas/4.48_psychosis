@@ -23,6 +23,9 @@ setup(
     exclude_package_data = {'': ['.gitignore']},
 
     #install_requires=[],
+    data_files=[
+        ('/usr/share/applications', ['texter/texter.desktop']),
+        ('/usr/share/icons/hicolor/32x32/apps/texter_icon.png', ['texter/icon.png'])],
 
     # installing unzipped
     zip_safe = False,
