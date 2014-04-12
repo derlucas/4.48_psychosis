@@ -1,6 +1,9 @@
+char zaehler;
 
 void setup() {
   Serial.begin(115200);
+  pinMode(7, OUTPUT);
+  zaehler = 0;
 }
 
 float getTemperature(void)
@@ -55,6 +58,7 @@ float getTemperature(void)
 
 
 void loop() {
+  zaehler++;
   int airFlow = analogRead(A1);
   int emg = analogRead(0);
   int temp = getTemperature();
@@ -64,5 +68,16 @@ void loop() {
   Serial.print(";");
   Serial.println(temp);
   delay(100);
+  
+  if(zaehler >= 10) {
+    zaehler = 0;
+    if(digitalRead(7) == HIGH) {
+      digitalWrite(7, LOW);
+    } else {
+      digitalWrite(7, HIGH);
+    }
+  }
+  
+
 }
 
