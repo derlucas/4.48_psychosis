@@ -1,0 +1,19 @@
+[Desktop Entry]
+Comment[en_US]=
+Comment=
+Exec=ffmpeg -f x11grab -s 768x576 -r 30 -i :0.0+9,89  -vcodec mjpeg -vcodec mjpeg http://localhost:8090/webcam.ffm
+GenericName[en_US]=Grabs a desktop region
+GenericName=Grabs a desktop region
+Icon=exec
+MimeType=
+Name[en_US]=4.48 Desktop Grabber
+Name=4.48 Desktop Grabber
+Path=
+StartupNotify=true
+Terminal=true
+TerminalOptions=\s--noclose
+Type=Application
+X-DBUS-ServiceName=
+X-DBUS-StartupType=none
+X-KDE-SubstituteUID=false
+X-KDE-Username=
