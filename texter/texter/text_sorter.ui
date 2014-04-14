@@ -17,7 +17,11 @@
    <item>
     <layout class="QHBoxLayout" name="horizontalLayout">
      <item>
-      <widget class="KEditListWidget" name="text_list"/>
+      <widget class="KEditListWidget" name="text_list">
+       <property name="buttons">
+        <set>KEditListWidget::Remove|KEditListWidget::UpDown</set>
+       </property>
+      </widget>
      </item>
      <item>
       <widget class="KRichTextWidget" name="text_preview"/>

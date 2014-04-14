@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>1554</width>
-    <height>658</height>
+    <height>617</height>
    </rect>
   </property>
   <property name="palette">
@@ -105,14 +105,17 @@
           <pointsize>22</pointsize>
          </font>
         </property>
+        <property name="cursor" stdset="0">
+         <cursorShape>BlankCursor</cursorShape>
+        </property>
         <property name="toolTip">
-         <string comment="tooltip1" extracomment="tooltip comment">live text</string>
+         <string/>
         </property>
         <property name="statusTip">
-         <string comment="statustip1" extracomment="status tip comment"/>
+         <string/>
         </property>
         <property name="whatsThis">
-         <string comment="whatsthis1" extracomment="whats this comment"/>
+         <string/>
         </property>
         <property name="autoFillBackground">
          <bool>false</bool>
@@ -130,7 +133,7 @@
         <item>
          <widget class="KPushButton" name="clear_live_button">
           <property name="toolTip">
-           <string>clear live text</string>
+           <string>clear live text [F1]</string>
           </property>
           <property name="icon">
            <iconset theme="edit-clear">
@@ -144,15 +147,13 @@
         </item>
         <item>
          <widget class="KPushButton" name="live_save_button">
-          <property name="icon">
-           <iconset theme="document-save"/>
+          <property name="toolTip">
+           <string>save live text [F2]</string>
           </property>
-         </widget>
-        </item>
-        <item>
-         <widget class="KColorButton" name="live_color">
-          <property name="text">
-           <string>background</string>
+          <property name="icon">
+           <iconset theme="document-save">
+            <normaloff/>
+           </iconset>
           </property>
          </widget>
         </item>
@@ -168,6 +169,19 @@
            </size>
           </property>
          </spacer>
+        </item>
+        <item>
+         <widget class="KPushButton" name="streaming_button">
+          <property name="toolTip">
+           <string>starts/stops live textfield streaming [F9]</string>
+          </property>
+          <property name="icon">
+           <iconset theme="media-record"/>
+          </property>
+          <property name="checkable">
+           <bool>true</bool>
+          </property>
+         </widget>
         </item>
        </layout>
       </item>
@@ -220,13 +234,13 @@
         <item>
          <widget class="KPushButton" name="clear_preview_button">
           <property name="toolTip">
-           <string>clear preview text</string>
+           <string>clear preview text [F4]</string>
           </property>
           <property name="statusTip">
-           <string>status tip2</string>
+           <string/>
           </property>
           <property name="whatsThis">
-           <string>whatsthis2</string>
+           <string/>
           </property>
           <property name="icon">
            <iconset theme="edit-clear">
@@ -239,9 +253,21 @@
          </widget>
         </item>
         <item>
+         <widget class="KPushButton" name="preview_save_button">
+          <property name="icon">
+           <iconset theme="document-save">
+            <normaloff/>
+           </iconset>
+          </property>
+         </widget>
+        </item>
+        <item>
          <widget class="KPushButton" name="publish_button">
+          <property name="cursor">
+           <cursorShape>ArrowCursor</cursorShape>
+          </property>
           <property name="toolTip">
-           <string>go live with text</string>
+           <string>go live with text [F5]</string>
           </property>
           <property name="icon">
            <iconset theme="media-playback-start">
@@ -254,20 +280,6 @@
          </widget>
         </item>
         <item>
-         <widget class="KPushButton" name="previous_button">
-          <property name="icon">
-           <iconset theme="media-skip-backward"/>
-          </property>
-         </widget>
-        </item>
-        <item>
-         <widget class="KPushButton" name="next_button">
-          <property name="icon">
-           <iconset theme="media-skip-forward"/>
-          </property>
-         </widget>
-        </item>
-        <item>
          <widget class="Line" name="line">
           <property name="orientation">
            <enum>Qt::Vertical</enum>
@@ -275,23 +287,51 @@
          </widget>
         </item>
         <item>
-         <widget class="KColorButton" name="preview_color">
-          <property name="text">
-           <string>background</string>
+         <widget class="KPushButton" name="previous_button">
+          <property name="toolTip">
+           <string>load previous text [F6]</string>
+          </property>
+          <property name="icon">
+           <iconset theme="media-skip-backward">
+            <normaloff/>
+           </iconset>
           </property>
          </widget>
         </item>
         <item>
-         <widget class="KPushButton" name="preview_save_button">
+         <widget class="KPushButton" name="next_button">
+          <property name="toolTip">
+           <string>load next text [F7]</string>
+          </property>
           <property name="icon">
-           <iconset theme="document-save"/>
+           <iconset theme="media-skip-forward">
+            <normaloff/>
+           </iconset>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="KComboBox" name="text_combo">
+          <property name="sizePolicy">
+           <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
+            <horstretch>0</horstretch>
+            <verstretch>0</verstretch>
+           </sizepolicy>
+          </property>
+          <property name="editable">
+           <bool>true</bool>
           </property>
          </widget>
         </item>
         <item>
          <widget class="KPushButton" name="text_open_button">
+          <property name="toolTip">
+           <string>edit sorting of saved texts [F10]</string>
+          </property>
           <property name="icon">
-           <iconset theme="document-open"/>
+           <iconset theme="document-open">
+            <normaloff/>
+           </iconset>
           </property>
          </widget>
         </item>
@@ -314,7 +354,6 @@
     </item>
    </layout>
   </widget>
-  <widget class="QStatusBar" name="statusbar"/>
  </widget>
  <customwidgets>
   <customwidget>
@@ -323,9 +362,9 @@
    <header>krichtextedit.h</header>
   </customwidget>
   <customwidget>
-   <class>KColorButton</class>
-   <extends>QPushButton</extends>
-   <header>kcolorbutton.h</header>
+   <class>KComboBox</class>
+   <extends>QComboBox</extends>
+   <header>kcombobox.h</header>
   </customwidget>
   <customwidget>
    <class>KPushButton</class>
@@ -346,7 +385,6 @@
  <tabstops>
   <tabstop>live_text</tabstop>
   <tabstop>preview_text</tabstop>
-  <tabstop>publish_button</tabstop>
   <tabstop>clear_preview_button</tabstop>
   <tabstop>clear_live_button</tabstop>
  </tabstops>
