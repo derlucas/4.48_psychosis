@@ -12,10 +12,11 @@ from operator import itemgetter
 from PyQt4 import QtCore, QtGui
 
 from PyKDE4.kdecore import ki18n, KCmdLineArgs, KAboutData
-from PyKDE4.kdeui import KActionCollection, KRichTextWidget, KComboBox, KPushButton, KRichTextWidget, KMainWindow, KToolBar, KApplication, KAction, KToolBarSpacerAction, KSelectAction, KToggleAction, KShortcut
+from PyKDE4.kdeui import KDialog, KActionCollection, KRichTextWidget, KComboBox, KPushButton, KRichTextWidget, KMainWindow, KToolBar, KApplication, KAction, KToolBarSpacerAction, KSelectAction, KToggleAction, KShortcut
 
 from texter_ui import Ui_MainWindow, _fromUtf8
-from text_sorter_ui import Ui_text_sorter_dialog
+from text_sorter_ui import Ui_TextSorterDialog
+from text_model import TextModel
 
 appName     = "texter"
 catalog     = "448texter"
@@ -36,21 +37,24 @@ for path in QtGui.QIcon.themeSearchPaths():
 # in your local icon directory:
 # ln -s /your/icon/theme/directory $HOME/.icons/hicolor
 
-class TextSorterDialog(QtGui.QDialog, Ui_text_sorter_dialog):
+class TextSorterDialog(QtGui.QWidget, Ui_TextSorterDialog):
     def __init__(self, parent = None):
         super(TextSorterDialog, self).__init__(parent)
 
-        # setup the ui
+        ## setup the ui
         self.setupUi(self)
-        self.setModal(False)
+        #self.setModal(False)
         self.fill_list()
 
-        self.text_list.listView().clicked.connect(self.slot_show_text)
-        self.accepted.connect(self.slot_saveToDb)
+        self.text_list.clicked.connect(self.slot_show_text)
+        #self.accepted.connect(self.slot_saveToDb)
+        self.remove_button.clicked.connect(self.slot_removeItem)
 
     def fill_list(self):
-        for preview, text in self.parent().text_db:
-            self.text_list.insertItem(preview)
+        self.model = self.parent().parent().model
+        self.text_list.setModel(self.model)
+        #for preview, text in self.parent().text_db:
+        #self.text_list.insertItem(preview)
 
     def slot_text_up(self):
         pass
@@ -59,21 +63,19 @@ class TextSorterDialog(QtGui.QDialog, Ui_text_sorter_dialog):
         pass
 
     def slot_show_text(self, model_index):
-        self.text_preview.setTextOrHtml(self.parent().text_db[model_index.row()][1])
+        self.text_preview.setTextOrHtml(self.parent().parent().model.text_db[model_index.row()][1])
 
     def slot_saveToDb(self):
         data = list()
-        self.parent().text_combo.clear()
-        parent = self.parent()
-        for preview in self.text_list.items():
-            pre, text = parent.text_by_preview(preview)
-            data.append((preview, text))
-            parent.text_combo.addAction(preview)
-            parent.text_combo.setCurrentItem(0)
-        parent.text_db = data
-        parent.slot_load_preview_text(0)
-        parent.slot_set_live_defaults()
-        parent.slot_set_preview_defaults()
+        pass
+
+
+    def slot_removeItem(self):
+        index = self.text_list.currentIndex().row()
+        print "remote index", index
+        self.model.removeRows(index, 1)
+
+
 
 
 class MainWindow(KMainWindow, Ui_MainWindow):
@@ -94,7 +96,8 @@ class MainWindow(KMainWindow, Ui_MainWindow):
         self.preview_actions = list()
         self.live_actions = list()
         self.current = 0
-        self.text_db = list()
+        self.model = TextModel(self)
+
         self.is_auto_publish = False
 
         self.setupUi(self)
@@ -107,8 +110,10 @@ class MainWindow(KMainWindow, Ui_MainWindow):
         self.toolbar.setMovable(False)
         self.toolbar.setFloatable(False)
         self.addToolBar(QtCore.Qt.BottomToolBarArea, self.toolbar)
+
         self.createLiveActions()
         self.createPreviewActions()
+        self.slot_load()
 
 
         self.preview_text.document().setDefaultFont(self.font)
@@ -144,7 +149,7 @@ class MainWindow(KMainWindow, Ui_MainWindow):
         self.streaming_action.triggered.connect(self.slot_toggle_streaming)
         self.auto_publish_action.toggled.connect(self.slot_auto_publish)
 
-        self.slot_load()
+
         self.next_action.triggered.connect(self.slot_next_item)
         self.previous_action.triggered.connect(self.slot_previous_item)
 
@@ -363,14 +368,7 @@ class MainWindow(KMainWindow, Ui_MainWindow):
 
 
     def get_preview_text(self, text):
-        return re.sub(" +", " ", text.replace("\n", " "))[:20]
-
-
-    def text_by_preview(self, preview):
-        for title, text in self.text_db:
-            if title == preview:
-                return title, text
-        return None
+        return re.sub(" +", " ", text.replace("\n", " ")).strip()[:20]
 
 
     def title_by_index(self, ix):
@@ -381,13 +379,13 @@ class MainWindow(KMainWindow, Ui_MainWindow):
 
 
     def slot_next_item(self):
-        self.current = (self.text_combo.currentItem() + 1) % len(self.text_db)
+        self.current = (self.text_combo.currentItem() + 1) % len(self.model.text_db)
         self.text_combo.setCurrentItem(self.current)
         self.slot_load_preview_text(self.current)
 
 
     def slot_previous_item(self):
-        self.current = (self.text_combo.currentItem() - 1) % len(self.text_db)
+        self.current = (self.text_combo.currentItem() - 1) % len(self.model.text_db)
         self.text_combo.setCurrentItem(self.current)
         self.slot_load_preview_text(self.current)
 
@@ -447,6 +445,15 @@ class MainWindow(KMainWindow, Ui_MainWindow):
         self.preview_text.clear()
         self.slot_set_preview_defaults()
 
+    def fill_combo_box(self):
+        print "fill_combo_box"
+        self.text_combo.clear()
+        for preview, text in self.model.text_db:
+            self.text_combo.addAction(preview)
+
+        self.text_combo.setCurrentItem(0)
+        self.slot_load_preview_text(0)
+
 
     def slot_removeItem(self):
         text = self.edit_item_selection.currentText()
@@ -461,8 +468,12 @@ class MainWindow(KMainWindow, Ui_MainWindow):
             self.item_title.clear()
             self.item_position_input.setValue(0)
 
+
     def slot_load_preview_text(self, index):
-        preview, text = self.text_db[index]
+        try:
+            preview, text = self.model.text_db[index]
+        except IndexError:
+            return
         self.preview_text.setTextOrHtml(text)
         if self.is_auto_publish:
             self.live_text.setTextOrHtml(text)
@@ -473,19 +484,20 @@ class MainWindow(KMainWindow, Ui_MainWindow):
         preview = self.get_preview_text(unicode(self.live_text.toPlainText()))
         if not preview:
             return
-        old_item = self.text_by_preview(preview)
+        old_item = self.model.text_by_preview(preview)
         if old_item is not None:
             suffix = 1
             while 1:
                 tmp_preview = "%s_%d" % (preview, suffix)
-                tmp = self.text_by_preview(tmp_preview)
+                tmp = self.model.text_by_preview(tmp_preview)
                 if tmp is None:
                     preview = tmp_preview
                     break
                 else:
                     suffix += 1
 
-        self.text_db.append((preview, text))
+        self.model.text_db.append([preview, text])
+        self.model.modelReset.emit()
         action = self.text_combo.addAction(preview)
         self.text_combo.setCurrentAction(action)
 
@@ -495,7 +507,7 @@ class MainWindow(KMainWindow, Ui_MainWindow):
 
         if not preview:
             return
-        old_item = self.text_by_preview(preview)
+        old_item = self.model.text_by_preview(preview)
         if old_item is not None:
             suffix = 1
             while 1:
@@ -507,9 +519,10 @@ class MainWindow(KMainWindow, Ui_MainWindow):
                 else:
                     suffix += 1
 
-        self.text_db.append((preview, text))
-        action = self.text_combo.addAction(preview)
-        self.text_combo.setCurrentAction(action)
+        self.model.text_db.append([preview, text])
+        self.model.modelReset.emit()
+        #action = self.text_combo.addAction(preview)
+        #self.text_combo.setCurrentAction(action)
 
     def slot_save(self):
         path = os.path.expanduser("~/.texter")
@@ -520,7 +533,7 @@ class MainWindow(KMainWindow, Ui_MainWindow):
         except IOError:
             return
         else:
-            cPickle.dump(self.text_db, f, cPickle.HIGHEST_PROTOCOL)
+            cPickle.dump(self.model.text_db, f, cPickle.HIGHEST_PROTOCOL)
 
     def slot_valign(self):
         fn = QtGui.QFontMetrics(self.font)
@@ -533,8 +546,12 @@ class MainWindow(KMainWindow, Ui_MainWindow):
         self.statusBar().showMessage("text lines = %d, line height = %d, max lines = %d" % (lines, h, max_lines))
 
     def slot_open_dialog(self):
-        self.dialog = TextSorterDialog(self)
-        self.dialog.open()
+        self.dialog = KDialog(self)
+        self.dialog_widget = TextSorterDialog(self.dialog)
+        self.dialog.setMainWidget(self.dialog_widget)
+        self.dialog.move(800, 0)
+        self.dialog.exec_()
+        self.fill_combo_box()
 
     def slot_load(self):
         path = os.path.expanduser("~/.texter")
@@ -546,16 +563,13 @@ class MainWindow(KMainWindow, Ui_MainWindow):
             return
 
         try:
-            self.text_db = cPickle.load(f)
+            self.model.text_db = [list(i) for  i in cPickle.load(f)]
         except Exception, e:
             print e
 
-        data = list()
-        for title, text in self.text_db:
-            data.append((title, text))
-            self.text_combo.addAction(title)
-
+        self.fill_combo_box()
         self.text_combo.setCurrentItem(0)
+        self.slot_load_preview_text(0)
         self.slot_load_preview_text(0)
 
 
