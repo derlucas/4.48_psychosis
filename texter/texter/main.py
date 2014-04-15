@@ -67,7 +67,6 @@ class TextSorterDialog(QtGui.QDialog, Ui_text_sorter_dialog):
         parent = self.parent()
         for preview in self.text_list.items():
             pre, text = parent.text_by_preview(preview)
-            print "pre, text", pre, preview
             data.append((preview, text))
             parent.text_combo.addAction(preview)
             parent.text_combo.setCurrentItem(0)
@@ -90,19 +89,17 @@ class MainWindow(KMainWindow, Ui_MainWindow):
         self.preview_font_action = None
         self.live_font_action = None
         self.preview_size_action = None
-        self.default_size = 28
-        self.default_font = None
+        self.default_size = 48
         self.default_align_text = "format_align_center"
         self.preview_actions = list()
         self.live_actions = list()
-        self.is_published = False
         self.current = 0
         self.text_db = list()
         self.is_auto_publish = False
 
         self.setupUi(self)
 
-        self.font = QtGui.QFont("monospace", 22)
+        self.font = QtGui.QFont("monospace", self.default_size)
         self.font.setStyleHint(QtGui.QFont.TypeWriter)
 
         self.toolbar = KToolBar(self, True, True)
@@ -115,12 +112,14 @@ class MainWindow(KMainWindow, Ui_MainWindow):
 
 
         self.preview_text.document().setDefaultFont(self.font)
+        self.preview_text.setFont(self.font)
         self.preview_text.setRichTextSupport(KRichTextWidget.RichTextSupport(0xffffffff))
         self.preview_editor_collection = KActionCollection(self)
         self.preview_text.createActions(self.preview_editor_collection)
 
         self.live_text.setRichTextSupport(KRichTextWidget.RichTextSupport(0xffffffff))
         self.live_text.document().setDefaultFont(self.font)
+        self.live_text.setFont(self.font)
         self.live_editor_collection = KActionCollection(self)
         self.live_text.createActions(self.live_editor_collection)
         self.filter_editor_actions()
@@ -131,6 +130,7 @@ class MainWindow(KMainWindow, Ui_MainWindow):
 
 
         self.save_action.triggered.connect(self.slot_save)
+        self.valign_action.triggered.connect(self.slot_valign)
         self.publish_action.triggered.connect(self.slot_publish)
         self.clear_live_action.triggered.connect(self.slot_clear_live)
         self.clear_preview_action.triggered.connect(self.slot_clear_preview)
@@ -209,11 +209,6 @@ class MainWindow(KMainWindow, Ui_MainWindow):
                 self.preview_font_action = action
 
 
-        print "live_center_action", self.live_center_action
-        print "live_size_action", self.live_size_action
-        print "preview_center_action", self.preview_center_action
-        print "preview_size_action", self.preview_size_action
-        #print "widgets", self.preview_font_action.associatedGraphicsWidgets()
         self.slot_set_preview_defaults()
         self.slot_set_live_defaults()
 
@@ -316,9 +311,15 @@ class MainWindow(KMainWindow, Ui_MainWindow):
         self.streaming_action.setShortcut(KShortcut(QtGui.QKeySequence(QtCore.Qt.CTRL + QtCore.Qt.Key_1)), KAction.ShortcutTypes(KAction.ActiveShortcut | KAction.DefaultShortcut))
         self.live_text_collection.addAction("stream", self.streaming_action)
 
+        self.valign_action = self.preview_text_collection.addAction("valign_action")
+        icon = QtGui.QIcon.fromTheme(_fromUtf8("media-stop"))
+        self.valign_action.setIcon(icon)
+        self.valign_action.setIconText("valign")
+        self.valign_action.setShortcut(KShortcut(QtGui.QKeySequence(QtCore.Qt.CTRL + QtCore.Qt.Key_Plus)), KAction.ShortcutTypes(KAction.ActiveShortcut | KAction.DefaultShortcut))
+
+
 
     def slot_auto_publish(self, state):
-        print "auto_publish", state
         self.is_auto_publish = bool(state)
 
 
@@ -386,14 +387,12 @@ class MainWindow(KMainWindow, Ui_MainWindow):
 
 
     def slot_previous_item(self):
-        #print "current_title", self.current_title, self.current_text
         self.current = (self.text_combo.currentItem() - 1) % len(self.text_db)
         self.text_combo.setCurrentItem(self.current)
         self.slot_load_preview_text(self.current)
 
 
     def slot_toggleToolbox(self, index):
-        #print "current_title", self.current_title, self.current_text
         if index == 0:
             self.toolBar.setEnabled(True)
         else:
@@ -402,7 +401,6 @@ class MainWindow(KMainWindow, Ui_MainWindow):
 
     def slot_publish(self):
         self.live_text.setTextOrHtml(self.preview_text.textOrHtml())
-        self.is_published = True
 
 
     def slot_toggle_publish(self, state=None):
@@ -416,31 +414,37 @@ class MainWindow(KMainWindow, Ui_MainWindow):
     def slot_set_preview_defaults(self):
         self.preview_center_action.setChecked(True)
         self.preview_text.alignCenter()
-        self.preview_size_action.setFontSize(self.default_size)
-        #self.preview_size_action.fontSizeChanged.emit(self.default_size)
+        self.font.setPointSize(self.default_size)
+        self.preview_text.setFont(self.font)
         self.preview_text.setFontSize(self.default_size)
+        self.preview_size_action.setFontSize(self.default_size)
+        self.preview_text.document().setDefaultFont(self.font)
 
 
     def slot_set_live_defaults(self):
         self.live_center_action.setChecked(True)
         self.live_text.alignCenter()
-        self.live_size_action.setFontSize(self.default_size)
+        self.font.setPointSize(self.default_size)
+        self.live_text.setFont(self.font)
         self.live_text.setFontSize(self.default_size)
+        self.live_size_action.setFontSize(self.default_size)
+        self.live_text.document().setDefaultFont(self.font)
 
 
     def slot_clear_live(self):
-        self.default_size = self.live_size_action.fontSize()
-        self.is_published = False
-        cursor = self.live_text.textCursor()
-        self.custom_clear(cursor)
+        #self.default_size = self.live_size_action.fontSize()
+        #cursor = self.live_text.textCursor()
+        #self.custom_clear(cursor)
+        self.live_text.clear()
         self.slot_set_live_defaults()
 
 
     def slot_clear_preview(self):
         #self.preview_text.document().clear()
-        self.default_size = self.preview_size_action.fontSize()
-        cursor = self.preview_text.textCursor()
-        self.custom_clear(cursor)
+        #self.default_size = self.preview_size_action.fontSize()
+        #cursor = self.preview_text.textCursor()
+        #self.custom_clear(cursor)
+        self.preview_text.clear()
         self.slot_set_preview_defaults()
 
 
@@ -508,15 +512,41 @@ class MainWindow(KMainWindow, Ui_MainWindow):
         self.text_combo.setCurrentAction(action)
 
     def slot_save(self):
-        cPickle.dump(self.text_db, open("448_texter.db", "w"), cPickle.HIGHEST_PROTOCOL)
+        path = os.path.expanduser("~/.texter")
+        if not os.path.isdir(path):
+            os.mkdir(path)
+        try:
+            f = open(os.path.join(path, "texter.db"), "w")
+        except IOError:
+            return
+        else:
+            cPickle.dump(self.text_db, f, cPickle.HIGHEST_PROTOCOL)
+
+    def slot_valign(self):
+        fn = QtGui.QFontMetrics(self.font)
+        h = fn.height()
+        max_lines = 576 / h
+        text = unicode(self.preview_text.toPlainText())
+        text = text.strip().strip("\n")
+        lines = text.count("\n") + 1
+        self.preview_text.setTextOrHtml("\n" * ((max_lines - lines) / 2) + text)
+        self.statusBar().showMessage("text lines = %d, line height = %d, max lines = %d" % (lines, h, max_lines))
 
     def slot_open_dialog(self):
         self.dialog = TextSorterDialog(self)
         self.dialog.open()
 
     def slot_load(self):
+        path = os.path.expanduser("~/.texter")
+        if not os.path.isdir(path):
+            os.mkdir(path)
         try:
-            self.text_db = cPickle.load(open("448_texter.db"))
+            f = open(os.path.join(path, "texter.db"))
+        except IOError:
+            return
+
+        try:
+            self.text_db = cPickle.load(f)
         except Exception, e:
             print e
 
