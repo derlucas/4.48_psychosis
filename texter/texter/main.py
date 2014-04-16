@@ -6,6 +6,7 @@ import os.path
 import re
 import subprocess
 import sys
+from math import pow
 
 from operator import itemgetter
 
@@ -41,41 +42,68 @@ class TextSorterDialog(QtGui.QWidget, Ui_TextSorterDialog):
     def __init__(self, parent = None):
         super(TextSorterDialog, self).__init__(parent)
 
-        ## setup the ui
         self.setupUi(self)
-        #self.setModal(False)
         self.fill_list()
 
         self.text_list.clicked.connect(self.slot_show_text)
-        #self.accepted.connect(self.slot_saveToDb)
         self.remove_button.clicked.connect(self.slot_removeItem)
+        self.move_up_button.clicked.connect(self.slot_text_up)
+        self.move_down_button.clicked.connect(self.slot_text_down)
+        self.text_list.clicked.connect(self.slot_toggle_buttons)
+        self.move_up_button.setEnabled(False)
+        self.move_down_button.setEnabled(False)
+
+
+    def slot_toggle_buttons(self, index):
+        row = index.row()
+        if row <= 0:
+            self.move_up_button.setEnabled(False)
+        else:
+            self.move_up_button.setEnabled(True)
+
+        if row >= len(self.model.text_db) - 1:
+            self.move_down_button.setEnabled(False)
+        else:
+            self.move_down_button.setEnabled(True)
 
     def fill_list(self):
         self.model = self.parent().parent().model
         self.text_list.setModel(self.model)
-        #for preview, text in self.parent().text_db:
-        #self.text_list.insertItem(preview)
 
     def slot_text_up(self):
-        pass
+        row = self.text_list.currentIndex().row()
+        if row <= 0:
+            return False
+
+        text_db = self.model.text_db
+        text_db[row-1], text_db[row] = text_db[row], text_db[row-1]
+        self.text_list.setCurrentIndex(self.model.index(row - 1, 0))
+        self.text_list.clicked.emit(self.model.index(row - 1, 0))
+        return True
 
     def slot_text_down(self):
-        pass
+        text_db = self.model.text_db
+        row = self.text_list.currentIndex().row()
+        if row >= len(text_db) - 1:
+            return False
+
+        text_db[row], text_db[row+1] = text_db[row+1], text_db[row]
+        index = self.model.index(row + 1, 0)
+        self.text_list.setCurrentIndex(index)
+        self.text_list.clicked.emit(index)
+        return True
 
     def slot_show_text(self, model_index):
         self.text_preview.setTextOrHtml(self.parent().parent().model.text_db[model_index.row()][1])
-
-    def slot_saveToDb(self):
-        data = list()
-        pass
 
 
     def slot_removeItem(self):
         index = self.text_list.currentIndex().row()
         print "remote index", index
         self.model.removeRows(index, 1)
-
-
+        index = self.model.index(0, 0)
+        self.text_list.setCurrentIndex(index)
+        self.text_list.clicked.emit(index)
 
 
 class MainWindow(KMainWindow, Ui_MainWindow):
@@ -109,12 +137,12 @@ class MainWindow(KMainWindow, Ui_MainWindow):
         self.toolbar.setAllowedAreas(QtCore.Qt.BottomToolBarArea)
         self.toolbar.setMovable(False)
         self.toolbar.setFloatable(False)
+        self.toolbar.setToolButtonStyle(QtCore.Qt.ToolButtonTextUnderIcon)
         self.addToolBar(QtCore.Qt.BottomToolBarArea, self.toolbar)
 
         self.createLiveActions()
         self.createPreviewActions()
         self.slot_load()
-
 
         self.preview_text.document().setDefaultFont(self.font)
         self.preview_text.setFont(self.font)
@@ -133,9 +161,8 @@ class MainWindow(KMainWindow, Ui_MainWindow):
 
         self.show()
 
-
         self.save_action.triggered.connect(self.slot_save)
-        self.valign_action.triggered.connect(self.slot_valign)
+        #self.valign_action.triggered.connect(self.slot_valign)
         self.publish_action.triggered.connect(self.slot_publish)
         self.clear_live_action.triggered.connect(self.slot_clear_live)
         self.clear_preview_action.triggered.connect(self.slot_clear_preview)
@@ -148,13 +175,15 @@ class MainWindow(KMainWindow, Ui_MainWindow):
         self.save_preview_action.triggered.connect(self.slot_save_preview_text)
         self.streaming_action.triggered.connect(self.slot_toggle_streaming)
         self.auto_publish_action.toggled.connect(self.slot_auto_publish)
-
+        self.preview_size_action.triggered[QtGui.QAction].connect(self.slot_preview_font_size)
+        self.live_size_action.triggered[QtGui.QAction].connect(self.slot_live_font_size)
 
         self.next_action.triggered.connect(self.slot_next_item)
         self.previous_action.triggered.connect(self.slot_previous_item)
 
         app.aboutToQuit.connect(self.kill_streaming)
         self.getLiveCoords()
+        print "desktop", app.desktop().availableGeometry()
 
 
     def getLiveCoords(self):
@@ -163,6 +192,11 @@ class MainWindow(KMainWindow, Ui_MainWindow):
         x = global_rect.x()
         y = global_rect.y()
         self.statusBar().showMessage("live text editor dimensions: x=%r, y=%r, width=%r, height=%r" % (x, y, global_rect.width(), global_rect.height()))
+
+    def getPreviewCoords(self):
+        public_rect = self.preview_text.geometry()
+        global_rect = QtCore.QRect(self.mapToGlobal(public_rect.topLeft()), self.mapToGlobal(public_rect.bottomRight()))
+        return global_rect.x(), global_rect.y()
 
 
     def filter_editor_actions(self):
@@ -173,7 +207,7 @@ class MainWindow(KMainWindow, Ui_MainWindow):
             "direction_ltr",
             "direction_rtl",
             "format_font_family",
-            "format_font_size",
+            #"format_font_size",
             "format_text_background_color",
             "format_list_indent_more",
             "format_list_indent_less",
@@ -213,7 +247,6 @@ class MainWindow(KMainWindow, Ui_MainWindow):
             elif text == "format_font_family":
                 self.preview_font_action = action
 
-
         self.slot_set_preview_defaults()
         self.slot_set_live_defaults()
 
@@ -235,8 +268,6 @@ class MainWindow(KMainWindow, Ui_MainWindow):
         self.save_live_action.setIcon(icon)
         self.save_live_action.setIconText("save live")
         self.save_live_action.setShortcut(KShortcut(QtGui.QKeySequence(QtCore.Qt.ALT + QtCore.Qt.Key_W)), KAction.ShortcutTypes(KAction.ActiveShortcut | KAction.DefaultShortcut))
-
-
 
     def createPreviewActions(self):
         self.toolbar.show()
@@ -272,15 +303,6 @@ class MainWindow(KMainWindow, Ui_MainWindow):
         self.previous_action.setIconText("previous")
         self.previous_action.setShortcut(KShortcut(QtGui.QKeySequence(QtCore.Qt.ALT + QtCore.Qt.Key_Left)), KAction.ShortcutTypes(KAction.ActiveShortcut | KAction.DefaultShortcut))
 
-        self.text_combo = KSelectAction(self.preview_text_collection)
-        self.text_combo.setEditable(False)
-        self.text_combo.setComboWidth(100)
-        icon = QtGui.QIcon.fromTheme(_fromUtf8("document-open-recent"))
-        self.text_combo.setIcon(icon)
-        self.text_combo.setIconText("saved texts")
-        self.text_combo.setObjectName("text_combo")
-        self.preview_text_collection.addAction("saved texts", self.text_combo)
-
         self.next_action = self.preview_text_collection.addAction("next_action")
         icon = QtGui.QIcon.fromTheme(_fromUtf8("media-skip-forward"))
         self.next_action.setIcon(icon)
@@ -308,21 +330,30 @@ class MainWindow(KMainWindow, Ui_MainWindow):
         self.save_action.setIconText("save")
         self.save_action.setShortcut(KShortcut(QtGui.QKeySequence(QtCore.Qt.CTRL + QtCore.Qt.Key_S)), KAction.ShortcutTypes(KAction.ActiveShortcut | KAction.DefaultShortcut))
 
-        self.streaming_action = KToggleAction(self.live_text_collection)
+        self.streaming_action = KToggleAction(self.preview_text_collection)
         icon = QtGui.QIcon.fromTheme(_fromUtf8("media-record"))
         self.streaming_action.setIcon(icon)
         self.streaming_action.setIconText("stream")
         self.streaming_action.setObjectName("stream")
         self.streaming_action.setShortcut(KShortcut(QtGui.QKeySequence(QtCore.Qt.CTRL + QtCore.Qt.Key_1)), KAction.ShortcutTypes(KAction.ActiveShortcut | KAction.DefaultShortcut))
-        self.live_text_collection.addAction("stream", self.streaming_action)
+        self.preview_text_collection.addAction("stream", self.streaming_action)
 
-        self.valign_action = self.preview_text_collection.addAction("valign_action")
-        icon = QtGui.QIcon.fromTheme(_fromUtf8("media-stop"))
-        self.valign_action.setIcon(icon)
-        self.valign_action.setIconText("valign")
-        self.valign_action.setShortcut(KShortcut(QtGui.QKeySequence(QtCore.Qt.CTRL + QtCore.Qt.Key_Plus)), KAction.ShortcutTypes(KAction.ActiveShortcut | KAction.DefaultShortcut))
+        #self.valign_action = self.preview_text_collection.addAction("valign_action")
+        #icon = QtGui.QIcon.fromTheme(_fromUtf8("media-stop"))
+        #self.valign_action.setIcon(icon)
+        #self.valign_action.setIconText("valign")
+        #self.valign_action.setShortcut(KShortcut(QtGui.QKeySequence(QtCore.Qt.CTRL + QtCore.Qt.Key_Plus)), KAction.ShortcutTypes(KAction.ActiveShortcut | KAction.DefaultShortcut))
 
+        self.spacer = KToolBarSpacerAction(self.preview_text_collection)
+        self.preview_text_collection.addAction("spacer", self.spacer)
 
+        self.text_combo = KSelectAction(self.preview_text_collection)
+        self.text_combo.setEditable(False)
+        icon = QtGui.QIcon.fromTheme(_fromUtf8("document-open-recent"))
+        self.text_combo.setIcon(icon)
+        self.text_combo.setIconText("saved texts")
+        self.text_combo.setObjectName("text_combo")
+        self.preview_text_collection.addAction("saved texts", self.text_combo)
 
     def slot_auto_publish(self, state):
         self.is_auto_publish = bool(state)
@@ -400,6 +431,19 @@ class MainWindow(KMainWindow, Ui_MainWindow):
     def slot_publish(self):
         self.live_text.setTextOrHtml(self.preview_text.textOrHtml())
 
+    def slot_live_font_size(self, action):
+        print "font_size"
+        self.default_size = self.live_size_action.fontSize()
+        self.slot_set_preview_defaults()
+        self.slot_set_live_defaults()
+
+
+    def slot_preview_font_size(self, action):
+        print "font_size"
+        self.default_size = self.preview_size_action.fontSize()
+        self.slot_set_live_defaults()
+        self.slot_set_preview_defaults()
+
 
     def slot_toggle_publish(self, state=None):
 
@@ -413,8 +457,8 @@ class MainWindow(KMainWindow, Ui_MainWindow):
         self.preview_center_action.setChecked(True)
         self.preview_text.alignCenter()
         self.font.setPointSize(self.default_size)
-        self.preview_text.setFont(self.font)
         self.preview_text.setFontSize(self.default_size)
+        self.preview_text.setFont(self.font)
         self.preview_size_action.setFontSize(self.default_size)
         self.preview_text.document().setDefaultFont(self.font)
 
@@ -423,25 +467,18 @@ class MainWindow(KMainWindow, Ui_MainWindow):
         self.live_center_action.setChecked(True)
         self.live_text.alignCenter()
         self.font.setPointSize(self.default_size)
-        self.live_text.setFont(self.font)
         self.live_text.setFontSize(self.default_size)
+        self.live_text.setFont(self.font)
         self.live_size_action.setFontSize(self.default_size)
         self.live_text.document().setDefaultFont(self.font)
 
 
     def slot_clear_live(self):
-        #self.default_size = self.live_size_action.fontSize()
-        #cursor = self.live_text.textCursor()
-        #self.custom_clear(cursor)
         self.live_text.clear()
         self.slot_set_live_defaults()
 
 
     def slot_clear_preview(self):
-        #self.preview_text.document().clear()
-        #self.default_size = self.preview_size_action.fontSize()
-        #cursor = self.preview_text.textCursor()
-        #self.custom_clear(cursor)
         self.preview_text.clear()
         self.slot_set_preview_defaults()
 
@@ -512,7 +549,7 @@ class MainWindow(KMainWindow, Ui_MainWindow):
             suffix = 1
             while 1:
                 tmp_preview = "%s_%d" % (preview, suffix)
-                tmp = self.text_by_preview(tmp_preview)
+                tmp = self.model.text_by_preview(tmp_preview)
                 if tmp is None:
                     preview = tmp_preview
                     break
@@ -521,8 +558,8 @@ class MainWindow(KMainWindow, Ui_MainWindow):
 
         self.model.text_db.append([preview, text])
         self.model.modelReset.emit()
-        #action = self.text_combo.addAction(preview)
-        #self.text_combo.setCurrentAction(action)
+        action = self.text_combo.addAction(preview)
+        self.text_combo.setCurrentAction(action)
 
     def slot_save(self):
         path = os.path.expanduser("~/.texter")
@@ -535,21 +572,69 @@ class MainWindow(KMainWindow, Ui_MainWindow):
         else:
             cPickle.dump(self.model.text_db, f, cPickle.HIGHEST_PROTOCOL)
 
-    def slot_valign(self):
-        fn = QtGui.QFontMetrics(self.font)
-        h = fn.height()
-        max_lines = 576 / h
-        text = unicode(self.preview_text.toPlainText())
-        text = text.strip().strip("\n")
-        lines = text.count("\n") + 1
-        self.preview_text.setTextOrHtml("\n" * ((max_lines - lines) / 2) + text)
-        self.statusBar().showMessage("text lines = %d, line height = %d, max lines = %d" % (lines, h, max_lines))
+    #def slot_valign(self):
+        #fm = QtGui.QFontMetrics(self.font)
+        ##h = fn.height()
+        ##max_lines = 576 / h
+        ##text = unicode(self.preview_text.toPlainText())
+        ##text = text.strip().strip("\n")
+        ##lines = text.count("\n") + 1
+        ##self.preview_text.setTextOrHtml("\n" * ((max_lines - lines) / 2) + text)
+        ##self.statusBar().showMessage("text lines = %d, line height = %d, max lines = %d" % (lines, h, max_lines))
+        #text_layout = QtGui.QTextLayout(self.preview_text.textOrHtml(), self.font, self.preview_text)
+
+        ##self.text_combo.setCurrentAction(action)
+
+        #margin = 10.
+        #radius = min(self.preview_text.width()/2.0, self.preview_text.height()/2.0) - margin
+        #print "radius", type(radius), radius
+
+        #lineHeight = float(fm.height())
+        #print "lineHeight", type(lineHeight), lineHeight
+        #y = 0.
+
+        #text_layout.beginLayout()
+
+        #while 1:
+            #line = text_layout.createLine()
+            #if not line.isValid():
+                #break
+
+            #x1 = max(0.0, pow(pow(radius,2)-pow(radius-y,2), 0.5))
+            #x2 = max(0.0, pow(pow(radius,2)-pow(radius-(y+lineHeight),2), 0.5))
+            #x = max(x1, x2) + margin
+            #lineWidth = (self.preview_text.width() - margin) - x
+
+            #line.setLineWidth(lineWidth)
+            #line.setPosition(QtCore.QPointF(x, margin+y))
+            #y += line.height()
+
+        #text_layout.endLayout()
+
+        #painter = QtGui.QPainter()
+        #painter.begin(self.preview_text)
+        #painter.setRenderHint(QtGui.QPainter.Antialiasing)
+        #painter.fillRect(self.rect(), QtCore.Qt.black)
+        #painter.setBrush(QtGui.QBrush(QtCore.Qt.white))
+        #painter.setPen(QtGui.QPen(QtCore.Qt.white))
+        #text_layout.draw(painter, QtCore.QPoint(0,0))
+
+        #painter.setBrush(QtGui.QBrush(QtGui.QColor("#a6ce39")))
+        #painter.setPen(QtGui.QPen(QtCore.Qt.black))
+        #painter.drawEllipse(QtCore.QRectF(-radius, margin, 2*radius, 2*radius))
+        #painter.end()
 
     def slot_open_dialog(self):
         self.dialog = KDialog(self)
         self.dialog_widget = TextSorterDialog(self.dialog)
         self.dialog.setMainWidget(self.dialog_widget)
-        self.dialog.move(800, 0)
+        pos_x, pos_y = self.getPreviewCoords()
+        self.dialog.move(pos_x, 0)
+        rect = app.desktop().availableGeometry()
+        global_width = rect.width()
+        global_height = rect.height()
+        x = global_width - pos_x - 10
+        self.dialog.setFixedSize(x, global_height-40);
         self.dialog.exec_()
         self.fill_combo_box()
 

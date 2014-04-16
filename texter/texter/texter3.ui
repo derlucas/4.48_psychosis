@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>1554</width>
-    <height>584</height>
+    <width>1475</width>
+    <height>651</height>
    </rect>
   </property>
   <property name="palette">
@@ -82,95 +82,177 @@
     <normaloff>:/texter/icon.png</normaloff>:/texter/icon.png</iconset>
   </property>
   <widget class="QWidget" name="centralwidget">
-   <layout class="QHBoxLayout" name="horizontalLayout">
+   <layout class="QVBoxLayout" name="verticalLayout">
     <item>
-     <widget class="KRichTextWidget" name="live_text">
-      <property name="minimumSize">
-       <size>
-        <width>768</width>
-        <height>576</height>
-       </size>
-      </property>
-      <property name="maximumSize">
-       <size>
-        <width>768</width>
-        <height>576</height>
-       </size>
-      </property>
-      <property name="font">
-       <font>
-        <family>Monospace</family>
-        <pointsize>22</pointsize>
-       </font>
-      </property>
-      <property name="cursor" stdset="0">
-       <cursorShape>BlankCursor</cursorShape>
-      </property>
-      <property name="toolTip">
-       <string/>
-      </property>
-      <property name="statusTip">
-       <string/>
-      </property>
-      <property name="whatsThis">
-       <string/>
-      </property>
-      <property name="autoFillBackground">
-       <bool>false</bool>
-      </property>
-      <property name="acceptRichText">
-       <bool>true</bool>
-      </property>
-      <property name="textInteractionFlags">
-       <set>Qt::LinksAccessibleByKeyboard|Qt::LinksAccessibleByMouse|Qt::TextBrowserInteraction|Qt::TextEditable|Qt::TextEditorInteraction|Qt::TextSelectableByKeyboard|Qt::TextSelectableByMouse</set>
-      </property>
-      <property name="richTextSupport">
-       <set>KRichTextWidget::SupportAlignment|KRichTextWidget::SupportChangeListStyle|KRichTextWidget::SupportFontFamily|KRichTextWidget::SupportFontSize|KRichTextWidget::SupportIndentLists|KRichTextWidget::SupportTextForegroundColor</set>
-      </property>
-     </widget>
+     <layout class="QHBoxLayout" name="horizontalLayout">
+      <item>
+       <widget class="KRichTextWidget" name="live_text">
+        <property name="minimumSize">
+         <size>
+          <width>769</width>
+          <height>577</height>
+         </size>
+        </property>
+        <property name="maximumSize">
+         <size>
+          <width>769</width>
+          <height>577</height>
+         </size>
+        </property>
+        <property name="palette">
+         <palette>
+          <active>
+           <colorrole role="Highlight">
+            <brush brushstyle="SolidPattern">
+             <color alpha="255">
+              <red>0</red>
+              <green>0</green>
+              <blue>0</blue>
+             </color>
+            </brush>
+           </colorrole>
+           <colorrole role="Link">
+            <brush brushstyle="SolidPattern">
+             <color alpha="255">
+              <red>255</red>
+              <green>255</green>
+              <blue>255</blue>
+             </color>
+            </brush>
+           </colorrole>
+          </active>
+          <inactive>
+           <colorrole role="Highlight">
+            <brush brushstyle="SolidPattern">
+             <color alpha="255">
+              <red>0</red>
+              <green>0</green>
+              <blue>0</blue>
+             </color>
+            </brush>
+           </colorrole>
+           <colorrole role="Link">
+            <brush brushstyle="SolidPattern">
+             <color alpha="255">
+              <red>255</red>
+              <green>255</green>
+              <blue>255</blue>
+             </color>
+            </brush>
+           </colorrole>
+          </inactive>
+          <disabled>
+           <colorrole role="Highlight">
+            <brush brushstyle="SolidPattern">
+             <color alpha="255">
+              <red>0</red>
+              <green>0</green>
+              <blue>0</blue>
+             </color>
+            </brush>
+           </colorrole>
+           <colorrole role="Link">
+            <brush brushstyle="SolidPattern">
+             <color alpha="255">
+              <red>255</red>
+              <green>255</green>
+              <blue>255</blue>
+             </color>
+            </brush>
+           </colorrole>
+          </disabled>
+         </palette>
+        </property>
+        <property name="cursor" stdset="0">
+         <cursorShape>BlankCursor</cursorShape>
+        </property>
+        <property name="autoFillBackground">
+         <bool>false</bool>
+        </property>
+        <property name="acceptRichText">
+         <bool>true</bool>
+        </property>
+        <property name="textInteractionFlags">
+         <set>Qt::LinksAccessibleByKeyboard|Qt::LinksAccessibleByMouse|Qt::TextBrowserInteraction|Qt::TextEditable|Qt::TextEditorInteraction|Qt::TextSelectableByKeyboard|Qt::TextSelectableByMouse</set>
+        </property>
+        <property name="richTextSupport">
+         <set>KRichTextWidget::SupportAlignment|KRichTextWidget::SupportChangeListStyle|KRichTextWidget::SupportFontFamily|KRichTextWidget::SupportFontSize|KRichTextWidget::SupportIndentLists|KRichTextWidget::SupportTextForegroundColor</set>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="KRichTextWidget" name="preview_text">
+        <property name="sizePolicy">
+         <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
+          <horstretch>10</horstretch>
+          <verstretch>0</verstretch>
+         </sizepolicy>
+        </property>
+        <property name="minimumSize">
+         <size>
+          <width>300</width>
+          <height>577</height>
+         </size>
+        </property>
+        <property name="maximumSize">
+         <size>
+          <width>769</width>
+          <height>577</height>
+         </size>
+        </property>
+        <property name="contextMenuPolicy">
+         <enum>Qt::ActionsContextMenu</enum>
+        </property>
+        <property name="toolTip">
+         <string>preview text</string>
+        </property>
+        <property name="autoFillBackground">
+         <bool>false</bool>
+        </property>
+        <property name="frameShape">
+         <enum>QFrame::StyledPanel</enum>
+        </property>
+        <property name="acceptRichText">
+         <bool>true</bool>
+        </property>
+        <property name="textInteractionFlags">
+         <set>Qt::LinksAccessibleByKeyboard|Qt::LinksAccessibleByMouse|Qt::TextBrowserInteraction|Qt::TextEditable|Qt::TextEditorInteraction|Qt::TextSelectableByKeyboard|Qt::TextSelectableByMouse</set>
+        </property>
+        <property name="richTextSupport">
+         <set>KRichTextWidget::SupportAlignment|KRichTextWidget::SupportChangeListStyle|KRichTextWidget::SupportFontFamily|KRichTextWidget::SupportFontSize|KRichTextWidget::SupportTextForegroundColor</set>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <spacer name="horizontalSpacer">
+        <property name="orientation">
+         <enum>Qt::Horizontal</enum>
+        </property>
+        <property name="sizeType">
+         <enum>QSizePolicy::MinimumExpanding</enum>
+        </property>
+        <property name="sizeHint" stdset="0">
+         <size>
+          <width>40</width>
+          <height>20</height>
+         </size>
+        </property>
+       </spacer>
+      </item>
+     </layout>
     </item>
     <item>
-     <widget class="KRichTextWidget" name="preview_text">
-      <property name="minimumSize">
+     <spacer name="verticalSpacer">
+      <property name="orientation">
+       <enum>Qt::Vertical</enum>
+      </property>
+      <property name="sizeHint" stdset="0">
        <size>
-        <width>400</width>
-        <height>576</height>
+        <width>20</width>
+        <height>40</height>
        </size>
       </property>
-      <property name="maximumSize">
-       <size>
-        <width>768</width>
-        <height>576</height>
-       </size>
-      </property>
-      <property name="font">
-       <font>
-        <family>Monospace</family>
-        <pointsize>22</pointsize>
-       </font>
-      </property>
-      <property name="contextMenuPolicy">
-       <enum>Qt::ActionsContextMenu</enum>
-      </property>
-      <property name="toolTip">
-       <string>preview text</string>
-      </property>
-      <property name="autoFillBackground">
-       <bool>false</bool>
-      </property>
-      <property name="frameShape">
-       <enum>QFrame::StyledPanel</enum>
-      </property>
-      <property name="acceptRichText">
-       <bool>true</bool>
-      </property>
-      <property name="textInteractionFlags">
-       <set>Qt::LinksAccessibleByKeyboard|Qt::LinksAccessibleByMouse|Qt::TextBrowserInteraction|Qt::TextEditable|Qt::TextEditorInteraction|Qt::TextSelectableByKeyboard|Qt::TextSelectableByMouse</set>
-      </property>
-      <property name="richTextSupport">
-       <set>KRichTextWidget::SupportAlignment|KRichTextWidget::SupportChangeListStyle|KRichTextWidget::SupportFontFamily|KRichTextWidget::SupportFontSize|KRichTextWidget::SupportTextForegroundColor</set>
-      </property>
-     </widget>
+     </spacer>
     </item>
    </layout>
   </widget>

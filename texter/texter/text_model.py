@@ -48,7 +48,10 @@ class TextModel(QtCore.QAbstractTableModel):
         return True
 
     def flags(self, index):
-        return QtCore.Qt.ItemIsSelectable |  QtCore.Qt.ItemIsEditable | QtCore.Qt.ItemIsEnabled
+        return QtCore.Qt.ItemIsSelectable |  QtCore.Qt.ItemIsEditable | QtCore.Qt.ItemIsEnabled | QtCore.Qt.ItemIsDragEnabled | QtCore.Qt.ItemIsDropEnabled
+
+    def supportedDropActions(self):
+        return QtCore.Qt.MoveAction
 
     def insertRows(self, row, count, parent=QtCore.QModelIndex()):
         self.beginInsertRows(parent, row, row+count+1)
