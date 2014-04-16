@@ -402,13 +402,6 @@ class MainWindow(KMainWindow, Ui_MainWindow):
         return re.sub(" +", " ", text.replace("\n", " ")).strip()[:20]
 
 
-    def title_by_index(self, ix):
-        for title, (text, index) in self.items.iteritems():
-            if index == ix:
-                return title
-        return None
-
-
     def slot_next_item(self):
         self.current = (self.text_combo.currentItem() + 1) % len(self.model.text_db)
         self.text_combo.setCurrentItem(self.current)
