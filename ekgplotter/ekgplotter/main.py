@@ -138,18 +138,23 @@ class OSCThread(threading.Thread):
         while self.running:
             try:
                 reads, writes, errs = select.select([self.osc_sock], [], [], 0.05)
-            except select.error:
+            except Exception, e:
+                print "select error", e
                 pass
-            if reads:
-                osc_input = self.osc_sock.recv(256)
-                osc_address, typetags, messages = decode_osc(osc_input, 0, len(osc_input))
-                #print "thread osc_address", osc_address
-                if osc_address.find("ekg") != -1 or osc_address.find("plot") != -1:
-                    queue.put_nowait((osc_address, messages))
             else:
-                queue.put_nowait(("/bjoern/ekg", [0]))
-                queue.put_nowait(("/merle/ekg", [0]))
-                queue.put_nowait(("/uwe/ekg", [0]))
+                if reads:
+                    try:
+                        osc_input, address = self.osc_sock.recvfrom(8192)
+                        osc_address, typetags, messages = decode_osc(osc_input, 0, len(osc_input))
+                        if osc_address.find("ekg") != -1 or osc_address.find("plot") != -1:
+                            queue.put_nowait((osc_address, messages))
+                    except Exception, e:
+                        print "recvfrom error", e
+                else:
+                    queue.put_nowait(("/bjoern/ekg", [0]))
+                    queue.put_nowait(("/merle/ekg", [0]))
+                    queue.put_nowait(("/uwe/ekg", [0]))
+
         self.unsubscribe_me()
         print "OSCThread is going down"
 
@@ -377,8 +382,8 @@ class MyHandler(BaseHTTPRequestHandler):
                             osc_address, args = queue.get_nowait()
                         except Queue.Empty:
                             break
-
-                        plotter.update(osc_address, args[0])
+                        else:
+                            plotter.update(osc_address, args[0])
 
                     exporter = pg.exporters.ImageExporter.ImageExporter(plotter.plot.plotItem)
                     img = exporter.export("tmpfile", True)
@@ -418,16 +423,19 @@ class MyHandler(BaseHTTPRequestHandler):
                 self.thread.join()
                 del self.thread
         except IOError, e:
-            if hasattr(self, "thread"):
-                self.thread.running = False
-                self.thread.join()
-                del self.thread
-            print "ioerror", e
-            print '-'*40
-            print 'Exception happened during processing of request from'
-            traceback.print_exc() # XXX But this goes to stderr!
-            print '-'*40
-            self.send_error(404,'File Not Found: %s' % self.path)
+            print "ioerror", e, e[0]
+            print dir(e)
+            if e[0] == 32:
+                if hasattr(self, "thread"):
+                    self.thread.running = False
+                    self.thread.join()
+                    del self.thread
+            else:
+                print '-'*40
+                print 'Exception happened during processing of request from'
+                traceback.print_exc() # XXX But this goes to stderr!
+                print '-'*40
+                self.send_error(404,'File Not Found: %s' % self.path)
 
 
 class JustAHTTPServer(HTTPServer):
