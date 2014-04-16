@@ -119,7 +119,7 @@ class MainWindow(KMainWindow, Ui_MainWindow):
         self.preview_font_action = None
         self.live_font_action = None
         self.preview_size_action = None
-        self.default_size = 48
+        self.default_size = 28
         self.default_align_text = "format_align_center"
         self.preview_actions = list()
         self.live_actions = list()
@@ -378,8 +378,8 @@ class MainWindow(KMainWindow, Ui_MainWindow):
     def start_streaming(self):
         public_rect = self.live_text.geometry()
         global_rect = QtCore.QRect(self.mapToGlobal(public_rect.topLeft()), self.mapToGlobal(public_rect.bottomRight()))
-        self.ffserver = subprocess.Popen("/usr/bin/ffserver -f /etc/ffserver.conf", shell=True, close_fds=True)
-        self.ffmpeg = subprocess.Popen("/usr/bin/ffmpeg -f x11grab -s 768x576 -r 25 -i :0.0+%d,%d -vcodec mjpeg -pix_fmt yuvj422p -r 25 -aspect 4:3 http://localhost:8090/webcam.ffm" % (global_rect.x(), global_rect.y()), shell=True, close_fds=True)
+        self.ffserver = subprocess.Popen("ffserver -f /etc/ffserver.conf", shell=True, close_fds=True)
+        self.ffmpeg = subprocess.Popen("ffmpeg -f x11grab -s 768x576 -r 25 -i :0.0+%d,%d -vcodec mjpeg -pix_fmt yuvj422p -r 25 -aspect 4:3 http://localhost:8090/webcam.ffm" % (global_rect.x()+1, global_rect.y()+1), shell=True, close_fds=True)
         self.is_streaming = True
 
     def focusChanged(self, old, new):
