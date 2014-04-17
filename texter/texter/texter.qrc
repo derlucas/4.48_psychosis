@@ -1,0 +1,5 @@
+<RCC>
+  <qresource prefix="texter">
+    <file>icon.png</file>
+  </qresource>
+</RCC>

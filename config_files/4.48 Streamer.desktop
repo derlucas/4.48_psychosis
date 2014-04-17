@@ -1,0 +1,19 @@
+[Desktop Entry]
+Comment[en_US]=
+Comment=
+Exec=ffserver -d -f /etc/ffserver.conf -v debug\n
+GenericName[en_US]=Streams desktop casts
+GenericName=Streams desktop casts
+Icon=exec
+MimeType=
+Name[en_US]=4.48 Streamer
+Name=4.48 Streamer
+Path=
+StartupNotify=true
+Terminal=true
+TerminalOptions=\s--noclose
+Type=Application
+X-DBUS-ServiceName=
+X-DBUS-StartupType=
+X-KDE-SubstituteUID=false
+X-KDE-Username=

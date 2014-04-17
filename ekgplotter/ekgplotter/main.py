@@ -136,17 +136,25 @@ class OSCThread(threading.Thread):
     def run(self):
 
         while self.running:
-            reads, writes, errs = select.select([self.osc_sock], [], [], 0.05)
-            if reads:
-                osc_input = self.osc_sock.recv(256)
-                osc_address, typetags, messages = decode_osc(osc_input, 0, len(osc_input))
-                #print "thread osc_address", osc_address
-                if osc_address.find("ekg") != -1 or osc_address.find("plot") != -1:
-                    queue.put_nowait((osc_address, messages))
+            try:
+                reads, writes, errs = select.select([self.osc_sock], [], [], 0.05)
+            except Exception, e:
+                print "select error", e
+                pass
             else:
-                queue.put_nowait(("/bjoern/ekg", [0]))
-                queue.put_nowait(("/merle/ekg", [0]))
-                queue.put_nowait(("/uwe/ekg", [0]))
+                if reads:
+                    try:
+                        osc_input, address = self.osc_sock.recvfrom(8192)
+                        osc_address, typetags, messages = decode_osc(osc_input, 0, len(osc_input))
+                        if osc_address.find("ekg") != -1 or osc_address.find("plot") != -1:
+                            queue.put_nowait((osc_address, messages))
+                    except Exception, e:
+                        print "recvfrom error", e
+                else:
+                    queue.put_nowait(("/bjoern/ekg", [0]))
+                    queue.put_nowait(("/merle/ekg", [0]))
+                    queue.put_nowait(("/uwe/ekg", [0]))
+
         self.unsubscribe_me()
         print "OSCThread is going down"
 
@@ -237,11 +245,11 @@ class Actor(object):
 
 class EkgPlot(object):
     def __init__(self, actor_names, num_data, colors):
-        self.plot = pg.PlotWidget(title="<h1>EKG</h1>")
+        self.plot = pg.PlotWidget()
         self.plot.hide()
-        self.plot.setLabel('left', "<h2>Amplitude</h2>")
-        self.plot.setLabel('bottom', "<h2><sup>Time</sup></h2>")
-        self.plot.showGrid(True, True)
+        #self.plot.setLabel('left', "<h2>Amplitude</h2>")
+        #self.plot.setLabel('bottom', "<h2><sup>Time</sup></h2>")
+        self.plot.showGrid(False, False)
         self.plot.setYRange(0, 255)
         self.plot.setXRange(0, num_data)
         self.plot.resize(1280, 720)
@@ -354,7 +362,7 @@ class MyHandler(BaseHTTPRequestHandler):
                 self.thread = thread = OSCThread(self.server.args)
                 thread.daemon = True
                 thread.start()
-                actor_names = ["bjoern", "merle", "uwe"]
+                actor_names = ["merle", "bjoern", "uwe"]
                 num_data = 100
                 colors = ["r", "g", "b"]
                 qtapp = QtGui.QApplication([])
@@ -374,8 +382,8 @@ class MyHandler(BaseHTTPRequestHandler):
                             osc_address, args = queue.get_nowait()
                         except Queue.Empty:
                             break
-
-                        plotter.update(osc_address, args[0])
+                        else:
+                            plotter.update(osc_address, args[0])
 
                     exporter = pg.exporters.ImageExporter.ImageExporter(plotter.plot.plotItem)
                     img = exporter.export("tmpfile", True)
@@ -386,10 +394,10 @@ class MyHandler(BaseHTTPRequestHandler):
                     JpegData = buffer.data()
                     self.wfile.write("--aaboundary\r\nContent-Type: image/jpeg\r\nContent-length: %d\r\n\r\n%s\r\n\r\n\r\n" % (len(JpegData), JpegData))
 
-                    del JpegData
-                    del buffer
-                    del img
-                    del exporter
+                    JpegData = None
+                    buffer = None
+                    img = None
+                    exporter = None
                     #now = time.time()
                     #dt = now - lastTime
                     #lastTime = now
@@ -410,21 +418,24 @@ class MyHandler(BaseHTTPRequestHandler):
             return
         except (KeyboardInterrupt, SystemError):
             print "queue size", queue.qsize()
-            if hasattr(self, "thread"):
+            if hasattr(self, "thread") and self.thread is not None:
                 self.thread.running = False
                 self.thread.join()
-                del self.thread
+                self.thread = None
         except IOError, e:
-            if hasattr(self, "thread"):
-                self.thread.running = False
-                self.thread.join()
-                del self.thread
-            print "ioerror", e
-            print '-'*40
-            print 'Exception happened during processing of request from'
-            traceback.print_exc() # XXX But this goes to stderr!
-            print '-'*40
-            self.send_error(404,'File Not Found: %s' % self.path)
+            print "ioerror", e, e[0]
+            print dir(e)
+            if e[0] in (32, 104):
+                if hasattr(self, "thread") and self.thread is not None:
+                    self.thread.running = False
+                    self.thread.join()
+                    self.thread = None
+            else:
+                print '-'*40
+                print 'Exception happened during processing of request from'
+                traceback.print_exc() # XXX But this goes to stderr!
+                print '-'*40
+                self.send_error(404,'File Not Found: %s' % self.path)
 
 
 class JustAHTTPServer(HTTPServer):
