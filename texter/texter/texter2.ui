@@ -1,0 +1,395 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>MainWindow</class>
+ <widget class="QMainWindow" name="MainWindow">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>1554</width>
+    <height>617</height>
+   </rect>
+  </property>
+  <property name="palette">
+   <palette>
+    <active>
+     <colorrole role="Text">
+      <brush brushstyle="SolidPattern">
+       <color alpha="255">
+        <red>255</red>
+        <green>255</green>
+        <blue>255</blue>
+       </color>
+      </brush>
+     </colorrole>
+     <colorrole role="Base">
+      <brush brushstyle="SolidPattern">
+       <color alpha="255">
+        <red>0</red>
+        <green>0</green>
+        <blue>0</blue>
+       </color>
+      </brush>
+     </colorrole>
+    </active>
+    <inactive>
+     <colorrole role="Text">
+      <brush brushstyle="SolidPattern">
+       <color alpha="255">
+        <red>255</red>
+        <green>255</green>
+        <blue>255</blue>
+       </color>
+      </brush>
+     </colorrole>
+     <colorrole role="Base">
+      <brush brushstyle="SolidPattern">
+       <color alpha="255">
+        <red>0</red>
+        <green>0</green>
+        <blue>0</blue>
+       </color>
+      </brush>
+     </colorrole>
+    </inactive>
+    <disabled>
+     <colorrole role="Text">
+      <brush brushstyle="SolidPattern">
+       <color alpha="255">
+        <red>169</red>
+        <green>167</green>
+        <blue>167</blue>
+       </color>
+      </brush>
+     </colorrole>
+     <colorrole role="Base">
+      <brush brushstyle="SolidPattern">
+       <color alpha="255">
+        <red>244</red>
+        <green>244</green>
+        <blue>244</blue>
+       </color>
+      </brush>
+     </colorrole>
+    </disabled>
+   </palette>
+  </property>
+  <property name="windowTitle">
+   <string>4.48 Texter</string>
+  </property>
+  <property name="windowIcon">
+   <iconset resource="texter.qrc">
+    <normaloff>:/texter/icon.png</normaloff>:/texter/icon.png</iconset>
+  </property>
+  <widget class="QWidget" name="centralwidget">
+   <layout class="QHBoxLayout" name="horizontalLayout_3">
+    <item>
+     <layout class="QVBoxLayout" name="verticalLayout">
+      <item>
+       <widget class="KRichTextWidget" name="live_text">
+        <property name="minimumSize">
+         <size>
+          <width>768</width>
+          <height>576</height>
+         </size>
+        </property>
+        <property name="maximumSize">
+         <size>
+          <width>768</width>
+          <height>576</height>
+         </size>
+        </property>
+        <property name="font">
+         <font>
+          <family>Monospace</family>
+          <pointsize>22</pointsize>
+         </font>
+        </property>
+        <property name="cursor" stdset="0">
+         <cursorShape>BlankCursor</cursorShape>
+        </property>
+        <property name="toolTip">
+         <string/>
+        </property>
+        <property name="statusTip">
+         <string/>
+        </property>
+        <property name="whatsThis">
+         <string/>
+        </property>
+        <property name="autoFillBackground">
+         <bool>false</bool>
+        </property>
+        <property name="acceptRichText">
+         <bool>true</bool>
+        </property>
+        <property name="textInteractionFlags">
+         <set>Qt::LinksAccessibleByKeyboard|Qt::LinksAccessibleByMouse|Qt::TextBrowserInteraction|Qt::TextEditable|Qt::TextEditorInteraction|Qt::TextSelectableByKeyboard|Qt::TextSelectableByMouse</set>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <layout class="QHBoxLayout" name="horizontalLayout_2">
+        <item>
+         <widget class="KPushButton" name="clear_live_button">
+          <property name="toolTip">
+           <string>clear live text [F1]</string>
+          </property>
+          <property name="icon">
+           <iconset theme="edit-clear">
+            <normaloff/>
+           </iconset>
+          </property>
+          <property name="shortcut">
+           <string>F1</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="KPushButton" name="live_save_button">
+          <property name="toolTip">
+           <string>save live text [F2]</string>
+          </property>
+          <property name="icon">
+           <iconset theme="document-save">
+            <normaloff/>
+           </iconset>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <spacer name="horizontalSpacer">
+          <property name="orientation">
+           <enum>Qt::Horizontal</enum>
+          </property>
+          <property name="sizeHint" stdset="0">
+           <size>
+            <width>40</width>
+            <height>20</height>
+           </size>
+          </property>
+         </spacer>
+        </item>
+        <item>
+         <widget class="KPushButton" name="streaming_button">
+          <property name="toolTip">
+           <string>starts/stops live textfield streaming [F9]</string>
+          </property>
+          <property name="icon">
+           <iconset theme="media-record"/>
+          </property>
+          <property name="checkable">
+           <bool>true</bool>
+          </property>
+         </widget>
+        </item>
+       </layout>
+      </item>
+     </layout>
+    </item>
+    <item>
+     <layout class="QVBoxLayout" name="verticalLayout_2">
+      <item>
+       <widget class="KRichTextWidget" name="preview_text">
+        <property name="minimumSize">
+         <size>
+          <width>400</width>
+          <height>576</height>
+         </size>
+        </property>
+        <property name="maximumSize">
+         <size>
+          <width>768</width>
+          <height>576</height>
+         </size>
+        </property>
+        <property name="font">
+         <font>
+          <family>Monospace</family>
+          <pointsize>22</pointsize>
+         </font>
+        </property>
+        <property name="contextMenuPolicy">
+         <enum>Qt::ActionsContextMenu</enum>
+        </property>
+        <property name="toolTip">
+         <string>preview text</string>
+        </property>
+        <property name="autoFillBackground">
+         <bool>false</bool>
+        </property>
+        <property name="frameShape">
+         <enum>QFrame::StyledPanel</enum>
+        </property>
+        <property name="acceptRichText">
+         <bool>true</bool>
+        </property>
+        <property name="textInteractionFlags">
+         <set>Qt::LinksAccessibleByKeyboard|Qt::LinksAccessibleByMouse|Qt::TextBrowserInteraction|Qt::TextEditable|Qt::TextEditorInteraction|Qt::TextSelectableByKeyboard|Qt::TextSelectableByMouse</set>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <layout class="QHBoxLayout" name="horizontalLayout">
+        <item>
+         <widget class="KPushButton" name="clear_preview_button">
+          <property name="toolTip">
+           <string>clear preview text [F4]</string>
+          </property>
+          <property name="statusTip">
+           <string/>
+          </property>
+          <property name="whatsThis">
+           <string/>
+          </property>
+          <property name="icon">
+           <iconset theme="edit-clear">
+            <normaloff/>
+           </iconset>
+          </property>
+          <property name="shortcut">
+           <string>F2</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="KPushButton" name="preview_save_button">
+          <property name="icon">
+           <iconset theme="document-save">
+            <normaloff/>
+           </iconset>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="KPushButton" name="publish_button">
+          <property name="cursor">
+           <cursorShape>ArrowCursor</cursorShape>
+          </property>
+          <property name="toolTip">
+           <string>go live with text [F5]</string>
+          </property>
+          <property name="icon">
+           <iconset theme="media-playback-start">
+            <normaloff/>
+           </iconset>
+          </property>
+          <property name="shortcut">
+           <string>F4</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="Line" name="line">
+          <property name="orientation">
+           <enum>Qt::Vertical</enum>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="KPushButton" name="previous_button">
+          <property name="toolTip">
+           <string>load previous text [F6]</string>
+          </property>
+          <property name="icon">
+           <iconset theme="media-skip-backward">
+            <normaloff/>
+           </iconset>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="KPushButton" name="next_button">
+          <property name="toolTip">
+           <string>load next text [F7]</string>
+          </property>
+          <property name="icon">
+           <iconset theme="media-skip-forward">
+            <normaloff/>
+           </iconset>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="KComboBox" name="text_combo">
+          <property name="sizePolicy">
+           <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
+            <horstretch>0</horstretch>
+            <verstretch>0</verstretch>
+           </sizepolicy>
+          </property>
+          <property name="editable">
+           <bool>true</bool>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="KPushButton" name="text_open_button">
+          <property name="toolTip">
+           <string>edit sorting of saved texts [F10]</string>
+          </property>
+          <property name="icon">
+           <iconset theme="document-open">
+            <normaloff/>
+           </iconset>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <spacer name="horizontalSpacer_2">
+          <property name="orientation">
+           <enum>Qt::Horizontal</enum>
+          </property>
+          <property name="sizeHint" stdset="0">
+           <size>
+            <width>40</width>
+            <height>20</height>
+           </size>
+          </property>
+         </spacer>
+        </item>
+       </layout>
+      </item>
+     </layout>
+    </item>
+   </layout>
+  </widget>
+ </widget>
+ <customwidgets>
+  <customwidget>
+   <class>KRichTextEdit</class>
+   <extends>KTextEdit</extends>
+   <header>krichtextedit.h</header>
+  </customwidget>
+  <customwidget>
+   <class>KComboBox</class>
+   <extends>QComboBox</extends>
+   <header>kcombobox.h</header>
+  </customwidget>
+  <customwidget>
+   <class>KPushButton</class>
+   <extends>QPushButton</extends>
+   <header>kpushbutton.h</header>
+  </customwidget>
+  <customwidget>
+   <class>KTextEdit</class>
+   <extends>QTextEdit</extends>
+   <header>ktextedit.h</header>
+  </customwidget>
+  <customwidget>
+   <class>KRichTextWidget</class>
+   <extends>KRichTextEdit</extends>
+   <header>krichtextwidget.h</header>
+  </customwidget>
+ </customwidgets>
+ <tabstops>
+  <tabstop>live_text</tabstop>
+  <tabstop>preview_text</tabstop>
+  <tabstop>clear_preview_button</tabstop>
+  <tabstop>clear_live_button</tabstop>
+ </tabstops>
+ <resources>
+  <include location="texter.qrc"/>
+ </resources>
+ <connections/>
+</ui>

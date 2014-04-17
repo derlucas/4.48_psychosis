@@ -1,0 +1,19 @@
+[Desktop Entry]
+Comment[de]=
+Comment=
+Exec=texter
+GenericName[de]=Live Text Streaming
+GenericName=Live Text Streaming
+Icon=texter_icon
+MimeType=
+Name[de]=texter
+Name=texter
+Path=/usr/bin/texter
+StartupNotify=true
+Type=Application
+Categories=AudioVideo;Recorder;
+X-DBUS-ServiceName=
+X-DBUS-StartupType=none
+X-KDE-SubstituteUID=false
+X-KDE-Username=
+Keywords=Capture;Broadcast;
