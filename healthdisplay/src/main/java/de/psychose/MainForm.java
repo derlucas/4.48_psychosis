@@ -1,3 +1,5 @@
+package de.psychose;
+
 import com.illposed.osc.OSCListener;
 import com.illposed.osc.OSCMessage;
 
@@ -82,8 +84,10 @@ public class MainForm {
 
     public static void main(String[] args) {
 
+        String host = args.length > 0 ? args[0] : "chaosc";
+
         try {
-            final ChaOSCclient chaOSCclient = new ChaOSCclient("chaosc", 7110);
+            final ChaOSCclient chaOSCclient = new ChaOSCclient(host, 7110);
 
             final MainForm mainForm = new MainForm(chaOSCclient);
             final JFrame frame = new JFrame("MainForm");

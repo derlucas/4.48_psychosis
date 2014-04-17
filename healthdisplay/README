@@ -1,0 +1,5 @@
+
+
+compile with
+
+mvn clean compile ideauidesigner:javac2  assembly:single

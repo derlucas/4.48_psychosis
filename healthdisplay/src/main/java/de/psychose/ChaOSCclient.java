@@ -1,3 +1,5 @@
+package de.psychose;
+
 import com.illposed.osc.OSCListener;
 import com.illposed.osc.OSCMessage;
 import com.illposed.osc.OSCPortIn;

@@ -1,3 +1,5 @@
+package de.psychose;
+
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.ActionEvent;
@@ -79,43 +81,43 @@ public class ActorDisplay {
 
 //                actorPanel.setBackground(new Color(r.nextInt(), false));
 
-                if(++counterTemperature > timeout) {
+                if (++counterTemperature > timeout) {
                     lblTemperature.setForeground(offColor);
                 } else {
                     lblTemperature.setForeground(onColor);
                 }
 
-                if(++counterPulse > timeout) {
+                if (++counterPulse > timeout) {
                     lblPulse.setForeground(offColor);
                 } else {
                     lblPulse.setForeground(onColor);
                 }
 
-                if(++counterOxy > timeout) {
+                if (++counterOxy > timeout) {
                     lblOxy.setForeground(offColor);
                 } else {
                     lblOxy.setForeground(onColor);
                 }
 
-                if(++counterEkg > timeout) {
+                if (++counterEkg > timeout) {
                     lblEkg.setForeground(offColor);
                 } else {
                     lblEkg.setForeground(onColor);
                 }
 
-                if(++counterEmg > timeout) {
+                if (++counterEmg > timeout) {
                     lblEmg.setForeground(offColor);
                 } else {
                     lblEmg.setForeground(onColor);
                 }
 
-                if(++counterHeartbeat > timeout) {
+                if (++counterHeartbeat > timeout) {
                     lblHeartbeat.setForeground(offColor);
                 } else {
                     lblHeartbeat.setForeground(onColor);
                 }
 
-                if(++counterBreath > timeout) {
+                if (++counterBreath > timeout) {
                     lblBreath.setForeground(offColor);
                 } else {
                     lblBreath.setForeground(onColor);
@@ -126,5 +128,6 @@ public class ActorDisplay {
         timer.setRepeats(true);
         timer.start();
     }
+
 }
 
