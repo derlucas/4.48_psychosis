@@ -1,14 +1,14 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <form xmlns="http://www.intellij.com/uidesigner/form/" version="1" bind-to-class="ActorDisplay">
-  <grid id="27dc6" binding="actorPanel" layout-manager="GridLayoutManager" row-count="8" column-count="2" same-size-horizontally="false" same-size-vertically="false" hgap="-1" vgap="-1">
+  <grid id="27dc6" binding="actorPanel" layout-manager="GridLayoutManager" row-count="9" column-count="2" same-size-horizontally="false" same-size-vertically="false" hgap="-1" vgap="-1">
     <margin top="4" left="6" bottom="4" right="6"/>
     <constraints>
-      <xy x="20" y="20" width="220" height="220"/>
+      <xy x="20" y="20" width="220" height="250"/>
     </constraints>
     <properties>
       <background color="-16777216"/>
       <foreground color="-1"/>
-      <minimumSize width="220" height="220"/>
+      <minimumSize width="220" height="250"/>
       <preferredSize width="0" height="0"/>
     </properties>
     <border type="line">
@@ -22,12 +22,12 @@
         <properties>
           <font name="Droid Sans Mono" size="20"/>
           <foreground color="-1"/>
-          <text value="Pulse"/>
+          <text value="Puls"/>
         </properties>
       </component>
       <vspacer id="1290">
         <constraints>
-          <grid row="7" column="0" row-span="1" col-span="1" vsize-policy="6" hsize-policy="1" anchor="0" fill="2" indent="0" use-parent-layout="false"/>
+          <grid row="8" column="0" row-span="1" col-span="1" vsize-policy="6" hsize-policy="1" anchor="0" fill="2" indent="0" use-parent-layout="false"/>
         </constraints>
       </vspacer>
       <component id="d0a2" class="javax.swing.JLabel" binding="lblPulse">
@@ -77,7 +77,7 @@
         <properties>
           <font name="Droid Sans Mono" size="20"/>
           <foreground color="-1"/>
-          <text value="Heart"/>
+          <text value="Herz"/>
         </properties>
       </component>
       <component id="e1c6d" class="javax.swing.JLabel" binding="lblOxy">
@@ -120,16 +120,6 @@
           <text value="-"/>
         </properties>
       </component>
-      <component id="9b787" class="javax.swing.JLabel" binding="lblCaption">
-        <constraints>
-          <grid row="0" column="0" row-span="1" col-span="1" vsize-policy="0" hsize-policy="0" anchor="8" fill="0" indent="0" use-parent-layout="false"/>
-        </constraints>
-        <properties>
-          <font name="Droid Sans Mono" size="28" style="1"/>
-          <foreground color="-1"/>
-          <text value="Label"/>
-        </properties>
-      </component>
       <component id="4d72a" class="javax.swing.JLabel">
         <constraints>
           <grid row="6" column="0" row-span="1" col-span="1" vsize-policy="0" hsize-policy="0" anchor="8" fill="0" indent="0" use-parent-layout="false"/>
@@ -143,6 +133,36 @@
       <component id="3a160" class="javax.swing.JLabel" binding="lblTemperature">
         <constraints>
           <grid row="6" column="1" row-span="1" col-span="1" vsize-policy="0" hsize-policy="0" anchor="4" fill="0" indent="0" use-parent-layout="false"/>
+        </constraints>
+        <properties>
+          <font name="Droid Sans Mono" size="20"/>
+          <foreground color="-1"/>
+          <text value="-"/>
+        </properties>
+      </component>
+      <component id="9b787" class="javax.swing.JLabel" binding="lblCaption">
+        <constraints>
+          <grid row="0" column="0" row-span="1" col-span="2" vsize-policy="0" hsize-policy="0" anchor="8" fill="0" indent="0" use-parent-layout="false"/>
+        </constraints>
+        <properties>
+          <font name="Droid Sans Mono" size="28" style="1"/>
+          <foreground color="-1"/>
+          <text value="Label"/>
+        </properties>
+      </component>
+      <component id="29a78" class="javax.swing.JLabel">
+        <constraints>
+          <grid row="7" column="0" row-span="1" col-span="1" vsize-policy="0" hsize-policy="0" anchor="8" fill="0" indent="0" use-parent-layout="false"/>
+        </constraints>
+        <properties>
+          <font name="Droid Sans Mono" size="20"/>
+          <foreground color="-1"/>
+          <text value="Atem"/>
+        </properties>
+      </component>
+      <component id="bb84f" class="javax.swing.JLabel" binding="lblBreath">
+        <constraints>
+          <grid row="7" column="1" row-span="1" col-span="1" vsize-policy="0" hsize-policy="0" anchor="4" fill="0" indent="0" use-parent-layout="false"/>
         </constraints>
         <properties>
           <font name="Droid Sans Mono" size="20"/>

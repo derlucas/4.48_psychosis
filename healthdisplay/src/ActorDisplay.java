@@ -19,6 +19,7 @@ public class ActorDisplay {
     private JLabel lblEkg;
     private JLabel lblEmg;
     private JLabel lblTemperature;
+    private JLabel lblBreath;
 
     private int counterHeartbeat = 0;
     private int counterPulse = 0;
@@ -26,11 +27,17 @@ public class ActorDisplay {
     private int counterEkg = 0;
     private int counterEmg = 0;
     private int counterTemperature = 0;
+    private int counterBreath = 0;
 
     private int timeout = 20;   // 20 * 100ms
 
     public void setCaption(String caption) {
         lblCaption.setText(caption);
+    }
+
+    public void setBreath(String breath) {
+        lblBreath.setText(breath);
+        counterBreath = 0;
     }
 
     public void setTemperature(String temperature) {
@@ -106,6 +113,12 @@ public class ActorDisplay {
                     lblHeartbeat.setForeground(offColor);
                 } else {
                     lblHeartbeat.setForeground(onColor);
+                }
+
+                if(++counterBreath > timeout) {
+                    lblBreath.setForeground(offColor);
+                } else {
+                    lblBreath.setForeground(onColor);
                 }
 
             }

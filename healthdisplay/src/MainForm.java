@@ -24,9 +24,9 @@ public class MainForm {
         osCclient = client;
         osCclient.startReceiver();
 
-        addActor("merle", "Merle", actor1);
-        addActor("uwe", "Uwe", actor2);
-        addActor("bjoern", "Björn", actor3);
+        addActor("merle", "Proband 1", actor1);
+        addActor("uwe", "Proband 2", actor2);
+        addActor("bjoern", "Proband 3", actor3);
     }
 
 
@@ -69,12 +69,21 @@ public class MainForm {
                 }
             }
         });
+
+        osCclient.addListener("/" + actor.toLowerCase() + "/airFlow", new OSCListener() {
+            @Override
+            public void acceptMessage(Date time, OSCMessage message) {
+                if (message.getArguments().length == 1) {
+                    actorDisplay.setBreath(message.getArguments()[0].toString());
+                }
+            }
+        });
     }
 
     public static void main(String[] args) {
 
         try {
-            final ChaOSCclient chaOSCclient = new ChaOSCclient("localhost", 7110);
+            final ChaOSCclient chaOSCclient = new ChaOSCclient("chaosc", 7110);
 
             final MainForm mainForm = new MainForm(chaOSCclient);
             final JFrame frame = new JFrame("MainForm");

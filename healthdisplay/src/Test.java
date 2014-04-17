@@ -1,13 +1,16 @@
 import javax.sound.midi.*;
 import java.io.File;
+import java.util.HashSet;
 
 public class Test {
     public static final int NOTE_ON = 0x90;
     public static final int NOTE_OFF = 0x80;
-    public static final String[] NOTE_NAMES = {"C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"};
+    public static final String[] NOTE_NAMES = {"C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "H"};
 
     public static void main(String[] args) throws Exception {
         Sequence sequence = MidiSystem.getSequence(new File("/home/lucas/jake-avril_14th.mid"));
+
+        HashSet<String> notes = new HashSet<String>();
 
         int trackNumber = 0;
         for (Track track :  sequence.getTracks()) {
@@ -28,6 +31,9 @@ public class Test {
                         String noteName = NOTE_NAMES[note];
                         int velocity = sm.getData2();
                         System.out.println("Note on, " + noteName + octave + " key=" + key + " velocity: " + velocity);
+
+                        notes.add(noteName+octave);
+
                     } else if (sm.getCommand() == NOTE_OFF) {
                         int key = sm.getData1();
                         int octave = (key / 12)-1;
@@ -44,6 +50,12 @@ public class Test {
             }
 
             System.out.println();
+
+
         }
+
+
+
+        System.out.println(notes);
     }
 }
