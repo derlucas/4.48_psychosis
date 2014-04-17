@@ -394,10 +394,10 @@ class MyHandler(BaseHTTPRequestHandler):
                     JpegData = buffer.data()
                     self.wfile.write("--aaboundary\r\nContent-Type: image/jpeg\r\nContent-length: %d\r\n\r\n%s\r\n\r\n\r\n" % (len(JpegData), JpegData))
 
-                    del JpegData
-                    del buffer
-                    del img
-                    del exporter
+                    JpegData = None
+                    buffer = None
+                    img = None
+                    exporter = None
                     #now = time.time()
                     #dt = now - lastTime
                     #lastTime = now
@@ -418,18 +418,18 @@ class MyHandler(BaseHTTPRequestHandler):
             return
         except (KeyboardInterrupt, SystemError):
             print "queue size", queue.qsize()
-            if hasattr(self, "thread"):
+            if hasattr(self, "thread") and self.thread is not None:
                 self.thread.running = False
                 self.thread.join()
-                del self.thread
+                self.thread = None
         except IOError, e:
             print "ioerror", e, e[0]
             print dir(e)
-            if e[0] == 32:
-                if hasattr(self, "thread"):
+            if e[0] in (32, 104):
+                if hasattr(self, "thread") and self.thread is not None:
                     self.thread.running = False
                     self.thread.join()
-                    del self.thread
+                    self.thread = None
             else:
                 print '-'*40
                 print 'Exception happened during processing of request from'
