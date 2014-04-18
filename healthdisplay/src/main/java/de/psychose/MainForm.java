@@ -4,6 +4,7 @@ import com.illposed.osc.OSCListener;
 import com.illposed.osc.OSCMessage;
 
 import javax.swing.*;
+import java.awt.event.ActionEvent;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
 import java.net.SocketException;
@@ -21,14 +22,30 @@ public class MainForm {
     private ActorDisplay actor1;
     private ActorDisplay actor2;
     private ActorDisplay actor3;
+    private StatsDisplay statDisplay;
 
-    public MainForm(ChaOSCclient client) {
-        osCclient = client;
-        osCclient.startReceiver();
+    private int totalMessageCount = 0;
+    private int messagesTempCounter = 0;
+
+    public MainForm(ChaOSCclient chaOSCclient) {
+        osCclient = chaOSCclient;
 
         addActor("merle", "Proband 1", actor1);
         addActor("uwe", "Proband 2", actor2);
         addActor("bjoern", "Proband 3", actor3);
+
+        osCclient.startReceiver();
+
+        final Timer timer = new Timer(1000, new AbstractAction() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                statDisplay.setMessagesPerSec(String.valueOf(totalMessageCount - messagesTempCounter));
+                statDisplay.setMessageCount(String.valueOf(totalMessageCount));
+                messagesTempCounter = totalMessageCount;
+            }
+        });
+        timer.setRepeats(true);
+        timer.start();
     }
 
 
@@ -38,6 +55,7 @@ public class MainForm {
             @Override
             public void acceptMessage(Date time, OSCMessage message) {
                 if (message.getArguments().length == 3) {
+                    totalMessageCount++;
                     actorDisplay.setHeartbeat(message.getArguments()[0].toString());
                     actorDisplay.setPulse(message.getArguments()[1].toString());
                     actorDisplay.setOxy(message.getArguments()[2].toString());
@@ -49,6 +67,7 @@ public class MainForm {
             @Override
             public void acceptMessage(Date time, OSCMessage message) {
                 if (message.getArguments().length == 1) {
+                    totalMessageCount++;
                     actorDisplay.setEkg(message.getArguments()[0].toString());
                 }
             }
@@ -58,6 +77,7 @@ public class MainForm {
             @Override
             public void acceptMessage(Date time, OSCMessage message) {
                 if (message.getArguments().length == 1) {
+                    totalMessageCount++;
                     actorDisplay.setEmg(message.getArguments()[0].toString());
                 }
             }
@@ -67,6 +87,7 @@ public class MainForm {
             @Override
             public void acceptMessage(Date time, OSCMessage message) {
                 if (message.getArguments().length == 1) {
+                    totalMessageCount++;
                     actorDisplay.setTemperature(message.getArguments()[0].toString());
                 }
             }
@@ -76,6 +97,7 @@ public class MainForm {
             @Override
             public void acceptMessage(Date time, OSCMessage message) {
                 if (message.getArguments().length == 1) {
+                    totalMessageCount++;
                     actorDisplay.setBreath(message.getArguments()[0].toString());
                 }
             }
@@ -84,16 +106,16 @@ public class MainForm {
 
     public static void main(String[] args) {
 
-        String host = args.length > 0 ? args[0] : "chaosc";
+        final String host = args.length > 0 ? args[0] : "chaosc";
+        final int port = args.length > 1 ? Integer.parseInt(args[1]) : 7110;
 
         try {
-            final ChaOSCclient chaOSCclient = new ChaOSCclient(host, 7110);
-
+            final ChaOSCclient chaOSCclient = new ChaOSCclient(host, port);
             final MainForm mainForm = new MainForm(chaOSCclient);
             final JFrame frame = new JFrame("MainForm");
             frame.setContentPane(mainForm.mainPanel);
             frame.setResizable(false);
-            frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+            frame.setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE);
             frame.pack();
 
             frame.addWindowListener(new WindowAdapter() {
@@ -108,9 +130,7 @@ public class MainForm {
 
             new Streamer(8888, mainForm.mainPanel).run();
 
-        } catch (UnknownHostException e) {
-            e.printStackTrace();
-        } catch (SocketException e) {
+        } catch (UnknownHostException | SocketException e) {
             e.printStackTrace();
         }
     }
