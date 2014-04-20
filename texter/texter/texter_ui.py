@@ -2,7 +2,7 @@
 
 # Form implementation generated from reading ui file 'texter3.ui'
 #
-# Created: Wed Apr 16 20:48:51 2014
+# Created: Sat Apr 19 21:56:41 2014
 #      by: PyQt4 UI code generator 4.10.3
 #
 # WARNING! All changes made in this file will be lost!
@@ -57,8 +57,8 @@ class Ui_MainWindow(object):
         self.horizontalLayout = QtGui.QHBoxLayout()
         self.horizontalLayout.setObjectName(_fromUtf8("horizontalLayout"))
         self.live_text = KRichTextWidget(self.centralwidget)
-        self.live_text.setMinimumSize(QtCore.QSize(772,580))
-        self.live_text.setMaximumSize(QtCore.QSize(772,580))
+        self.live_text.setMinimumSize(QtCore.QSize(775, 578))
+        self.live_text.setMaximumSize(QtCore.QSize(775, 578))
         palette = QtGui.QPalette()
         brush = QtGui.QBrush(QtGui.QColor(0, 0, 0))
         brush.setStyle(QtCore.Qt.SolidPattern)
@@ -97,7 +97,7 @@ class Ui_MainWindow(object):
         brush.setStyle(QtCore.Qt.SolidPattern)
         palette.setBrush(QtGui.QPalette.Disabled, QtGui.QPalette.Link, brush)
         self.live_text.setPalette(palette)
-        self.live_text.viewport().setProperty("cursor", QtGui.QCursor(QtCore.Qt.BlankCursor))
+        self.live_text.viewport().setProperty("cursor", QtGui.QCursor(QtCore.Qt.ArrowCursor))
         self.live_text.setAutoFillBackground(True)
         self.live_text.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
         self.live_text.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
@@ -113,7 +113,7 @@ class Ui_MainWindow(object):
         sizePolicy.setHeightForWidth(self.preview_text.sizePolicy().hasHeightForWidth())
         self.preview_text.setSizePolicy(sizePolicy)
         self.preview_text.setMinimumSize(QtCore.QSize(300, 577))
-        self.preview_text.setMaximumSize(QtCore.QSize(772,580))
+        self.preview_text.setMaximumSize(QtCore.QSize(769, 577))
         palette = QtGui.QPalette()
         brush = QtGui.QBrush(QtGui.QColor(0, 0, 0))
         brush.setStyle(QtCore.Qt.SolidPattern)

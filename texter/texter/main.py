@@ -12,6 +12,7 @@ from operator import itemgetter
 
 from PyQt4 import QtCore, QtGui
 
+
 from PyKDE4.kdecore import ki18n, KCmdLineArgs, KAboutData
 from PyKDE4.kdeui import KDialog, KActionCollection, KRichTextWidget, KComboBox, KPushButton, KRichTextWidget, KMainWindow, KToolBar, KApplication, KAction, KToolBarSpacerAction, KSelectAction, KToggleAction, KShortcut
 
@@ -106,6 +107,104 @@ class TextSorterDialog(QtGui.QWidget, Ui_TextSorterDialog):
         self.text_list.clicked.emit(index)
 
 
+class TextAnimation(QtCore.QObject):
+    animation_started = QtCore.pyqtSignal()
+    animation_finished = QtCore.pyqtSignal()
+    animation_stopped = QtCore.pyqtSignal()
+
+    def __init__(self, parent=None):
+        super(TextAnimation, self).__init__(parent)
+        self.animated_document = None
+        self.cursor_position = 0
+        self.src_cursor = None
+        self.area = None
+        self.dst_cursor = None
+        self.text = None
+        self.it = None
+        self.timer = None
+        self.dst_current_block = None
+
+    def start_animation(self, animated_document, area, cursor_position):
+        print "start_animation", animated_document, area, cursor_position
+        if self.timer is not None:
+            print "timer is not None"
+            return False
+        self.animated_document = animated_document
+        self.area = area
+        self.cursor_position = cursor_position
+
+        self.src_cursor = QtGui.QTextCursor(self.animated_document)
+        self.src_cursor.setPosition(0)
+
+        self.dst_cursor = self.area.textCursor()
+        self.dst_cursor.setPosition(self.cursor_position)
+        self.timer = QtCore.QTimer(self)
+        self.timer.timeout.connect(self.slot_animate)
+        parent = self.parent()
+        parent.slot_clear_live()
+        #self.dst_cursor.setPosition(self.cursor_position)
+        self.timer.start(70)
+        print "timer started"
+        return True
+
+    def slot_animate(self):
+        print "slot_animate"
+        self.animation_started.emit()
+        parent = self.parent()
+
+        if self.it is None:
+            self.it = self.animated_document.rootFrame().begin()
+            #self.src_block = self.it.currentBlock()
+            #area_rootFrame = self.area.document().rootFrame()
+            #area_rootFrame.setFrameFormat(rootFrame.frameFormat())
+            #print "it is none", repr(self.src_block.text())
+
+        if not self.it.atEnd():
+            if self.text is None:
+                self.src_block = self.it.currentBlock()
+                text = unicode(self.src_block.text())
+                print "text", repr(text)
+                self.text = iter(text)
+                src_block_format = self.src_block.blockFormat()
+                if self.dst_current_block is not None:
+                    print "insert new block"
+                    self.dst_cursor.insertBlock(src_block_format)
+                    self.dst_current_block = self.dst_current_block.next()
+                else:
+                    self.dst_current_block = self.dst_cursor.block()
+                dst_char_format = self.dst_current_block.charFormat()
+                src_char_format = self.src_block.charFormat()
+                src_font_point_size = src_char_format.fontPointSize()
+                dst_char_format.setFontPointSize(src_font_point_size)
+                print "src font size", src_font_point_size
+                parent.default_size = src_font_point_size
+                parent.font.setPointSize(parent.default_size)
+                parent.live_text.setFontSize(parent.default_size)
+                parent.live_text.setFont(parent.font)
+                parent.live_size_action.setFontSize(parent.default_size)
+                #parent.live_text.document().setDefaultFont(parent.font)
+
+            try:
+                char = self.text.next()
+                print "char", char
+                self.dst_cursor.insertText(char)
+            except StopIteration:
+                print "end of block"
+                self.it += 1
+                self.text = None
+        else:
+            self.timer.stop()
+            self.timer.timeout.disconnect(self.slot_animate)
+            self.timer.deleteLater()
+            self.dst_current_block = None
+            self.it = None
+            self.text = None
+            self.animation_finished.emit()
+            self.timer = None
+            print "animation end"
+        print
+
+
 class MainWindow(KMainWindow, Ui_MainWindow):
     def __init__(self, parent=None):
         super(MainWindow, self).__init__(parent)
@@ -125,6 +224,8 @@ class MainWindow(KMainWindow, Ui_MainWindow):
         self.live_actions = list()
         self.current = 0
         self.model = TextModel(self)
+        self.animation = TextAnimation(self)
+        self.db_dirty = False
 
         self.is_auto_publish = False
 
@@ -142,22 +243,22 @@ class MainWindow(KMainWindow, Ui_MainWindow):
 
         self.createLiveActions()
         self.createPreviewActions()
-        self.slot_load()
 
-        self.preview_text.document().setDefaultFont(self.font)
+        #self.preview_text.document().setDefaultFont(self.font)
         self.preview_text.setFont(self.font)
         self.preview_text.setRichTextSupport(KRichTextWidget.RichTextSupport(0xffffffff))
         self.preview_editor_collection = KActionCollection(self)
         self.preview_text.createActions(self.preview_editor_collection)
 
         self.live_text.setRichTextSupport(KRichTextWidget.RichTextSupport(0xffffffff))
-        self.live_text.document().setDefaultFont(self.font)
+        #self.live_text.document().setDefaultFont(self.font)
         self.live_text.setFont(self.font)
         self.live_editor_collection = KActionCollection(self)
         self.live_text.createActions(self.live_editor_collection)
         self.filter_editor_actions()
         self.toolbar.insertSeparator(self.publish_action)
         self.toolbar.addSeparator()
+        self.slot_load()
 
         self.show()
 
@@ -181,7 +282,6 @@ class MainWindow(KMainWindow, Ui_MainWindow):
         self.next_action.triggered.connect(self.slot_next_item)
         self.previous_action.triggered.connect(self.slot_previous_item)
 
-        app.aboutToQuit.connect(self.kill_streaming)
         self.getLiveCoords()
         print "desktop", app.desktop().availableGeometry()
 
@@ -309,12 +409,10 @@ class MainWindow(KMainWindow, Ui_MainWindow):
         self.next_action.setIconText("next")
         self.next_action.setShortcut(KShortcut(QtGui.QKeySequence(QtCore.Qt.ALT + QtCore.Qt.Key_Right)), KAction.ShortcutTypes(KAction.ActiveShortcut | KAction.DefaultShortcut))
 
-        self.text_editor_action = KToggleAction(self.preview_text_collection)
+        self.text_editor_action = self.preview_text_collection.addAction("text_editor_action")
         icon = QtGui.QIcon.fromTheme(_fromUtf8("document-open"))
         self.text_editor_action.setIcon(icon)
-        self.text_editor_action.setIconText("sort")
-        self.preview_text_collection.addAction("text editor", self.text_editor_action)
-        self.text_editor_action.setObjectName("text_editor_action")
+        self.text_editor_action.setIconText("edit")
         self.text_editor_action.setShortcut(KShortcut(QtGui.QKeySequence(QtCore.Qt.CTRL + QtCore.Qt.Key_O)), KAction.ShortcutTypes(KAction.ActiveShortcut | KAction.DefaultShortcut))
 
         self.auto_publish_action = KToggleAction(self.preview_text_collection)
@@ -323,6 +421,7 @@ class MainWindow(KMainWindow, Ui_MainWindow):
         self.auto_publish_action.setIcon(icon)
         self.auto_publish_action.setObjectName("auto_publish_action")
         self.auto_publish_action.setIconText("auto publish")
+        self.auto_publish_action.setShortcut(KShortcut(QtGui.QKeySequence(QtCore.Qt.CTRL + QtCore.Qt.Key_P)), KAction.ShortcutTypes(KAction.ActiveShortcut | KAction.DefaultShortcut))
 
         self.save_action = self.preview_text_collection.addAction("save_action")
         icon = QtGui.QIcon.fromTheme(_fromUtf8("document-save"))
@@ -338,11 +437,11 @@ class MainWindow(KMainWindow, Ui_MainWindow):
         self.streaming_action.setShortcut(KShortcut(QtGui.QKeySequence(QtCore.Qt.CTRL + QtCore.Qt.Key_1)), KAction.ShortcutTypes(KAction.ActiveShortcut | KAction.DefaultShortcut))
         self.preview_text_collection.addAction("stream", self.streaming_action)
 
-        #self.valign_action = self.preview_text_collection.addAction("valign_action")
-        #icon = QtGui.QIcon.fromTheme(_fromUtf8("media-stop"))
-        #self.valign_action.setIcon(icon)
-        #self.valign_action.setIconText("valign")
-        #self.valign_action.setShortcut(KShortcut(QtGui.QKeySequence(QtCore.Qt.CTRL + QtCore.Qt.Key_Plus)), KAction.ShortcutTypes(KAction.ActiveShortcut | KAction.DefaultShortcut))
+        self.valign_action = self.preview_text_collection.addAction("valign_action")
+        icon = QtGui.QIcon.fromTheme(_fromUtf8("media-stop"))
+        self.valign_action.setIcon(icon)
+        self.valign_action.setIconText("valign")
+        self.valign_action.setShortcut(KShortcut(QtGui.QKeySequence(QtCore.Qt.CTRL + QtCore.Qt.Key_Plus)), KAction.ShortcutTypes(KAction.ActiveShortcut | KAction.DefaultShortcut))
 
         self.spacer = KToolBarSpacerAction(self.preview_text_collection)
         self.preview_text_collection.addAction("spacer", self.spacer)
@@ -355,18 +454,18 @@ class MainWindow(KMainWindow, Ui_MainWindow):
         self.text_combo.setObjectName("text_combo")
         self.preview_text_collection.addAction("saved texts", self.text_combo)
 
-    def slot_auto_publish(self, state):
-        self.is_auto_publish = bool(state)
+    def closeEvent(self, event):
+        self.stop_streaming()
+        if self.db_dirty:
+            self.dialog = KDialog(self)
+            self.dialog.setCaption("4.48 texter - text db not saved")
+            label = QtGui.QLabel("The Text database is not saved. Do you want to save before exit?", self.dialog)
+            self.dialog.setMainWidget(label)
+            self.dialog.setButtons(KDialog.ButtonCodes(KDialog.Ok | KDialog.Cancel))
+            self.dialog.okClicked.connect(self.slot_save)
+            self.dialog.exec_()
 
-
-    def slot_toggle_streaming(self):
-        if self.ffserver is None:
-            self.start_streaming()
-        else:
-            self.kill_streaming()
-
-
-    def kill_streaming(self):
+    def stop_streaming(self):
         self.is_streaming = False
         if self.ffmpeg is not None:
             self.ffmpeg.kill()
@@ -402,6 +501,17 @@ class MainWindow(KMainWindow, Ui_MainWindow):
         return re.sub(" +", " ", text.replace("\n", " ")).strip()[:20]
 
 
+    def slot_auto_publish(self, state):
+        self.is_auto_publish = bool(state)
+
+
+    def slot_toggle_streaming(self):
+        if self.ffserver is None:
+            self.start_streaming()
+        else:
+            self.stop_streaming()
+
+
     def slot_next_item(self):
         self.current = (self.text_combo.currentItem() + 1) % len(self.model.text_db)
         self.text_combo.setCurrentItem(self.current)
@@ -422,7 +532,10 @@ class MainWindow(KMainWindow, Ui_MainWindow):
 
 
     def slot_publish(self):
-        self.live_text.setTextOrHtml(self.preview_text.textOrHtml())
+        print "publish"
+        #self.live_text.setTextOrHtml(self.preview_text.textOrHtml())
+        self.animation.start_animation(self.preview_text.document(), self.live_text, 0)
+        self.slot_clear_live()
 
     def slot_live_font_size(self, action):
         print "font_size"
@@ -453,7 +566,7 @@ class MainWindow(KMainWindow, Ui_MainWindow):
         self.preview_text.setFontSize(self.default_size)
         self.preview_text.setFont(self.font)
         self.preview_size_action.setFontSize(self.default_size)
-        self.preview_text.document().setDefaultFont(self.font)
+        #self.preview_text.document().setDefaultFont(self.font)
 
 
     def slot_set_live_defaults(self):
@@ -463,7 +576,7 @@ class MainWindow(KMainWindow, Ui_MainWindow):
         self.live_text.setFontSize(self.default_size)
         self.live_text.setFont(self.font)
         self.live_size_action.setFontSize(self.default_size)
-        self.live_text.document().setDefaultFont(self.font)
+        #self.live_text.document().setDefaultFont(self.font)
 
 
     def slot_clear_live(self):
@@ -506,7 +619,7 @@ class MainWindow(KMainWindow, Ui_MainWindow):
             return
         self.preview_text.setTextOrHtml(text)
         if self.is_auto_publish:
-            self.live_text.setTextOrHtml(text)
+            self.slot_publish()
 
 
     def slot_save_live_text(self):
@@ -530,6 +643,7 @@ class MainWindow(KMainWindow, Ui_MainWindow):
         self.model.modelReset.emit()
         action = self.text_combo.addAction(preview)
         self.text_combo.setCurrentAction(action)
+        self.db_dirty = True
 
     def slot_save_preview_text(self):
         text = self.preview_text.toHtml()
@@ -553,6 +667,7 @@ class MainWindow(KMainWindow, Ui_MainWindow):
         self.model.modelReset.emit()
         action = self.text_combo.addAction(preview)
         self.text_combo.setCurrentAction(action)
+        self.db_dirty = True
 
     def slot_save(self):
         path = os.path.expanduser("~/.texter")
@@ -617,6 +732,9 @@ class MainWindow(KMainWindow, Ui_MainWindow):
         #painter.drawEllipse(QtCore.QRectF(-radius, margin, 2*radius, 2*radius))
         #painter.end()
 
+    def slot_valign(self):
+        self.animation = TextAnimation(self.preview_text.document(), )
+
     def slot_open_dialog(self):
         self.dialog = KDialog(self)
         self.dialog_widget = TextSorterDialog(self.dialog)
@@ -628,8 +746,10 @@ class MainWindow(KMainWindow, Ui_MainWindow):
         global_height = rect.height()
         x = global_width - pos_x - 10
         self.dialog.setFixedSize(x, global_height-40);
+        self.dialog.okClicked.connect(self.fill_combo_box)
         self.dialog.exec_()
-        self.fill_combo_box()
+        self.dialog.deleteLater()
+        self.dialog = None
 
     def slot_load(self):
         path = os.path.expanduser("~/.texter")
@@ -648,7 +768,7 @@ class MainWindow(KMainWindow, Ui_MainWindow):
         self.fill_combo_box()
         self.text_combo.setCurrentItem(0)
         self.slot_load_preview_text(0)
-        self.slot_load_preview_text(0)
+
 
 
 def main():
