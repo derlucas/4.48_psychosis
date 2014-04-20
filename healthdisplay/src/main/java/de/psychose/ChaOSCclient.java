@@ -1,3 +1,5 @@
+package de.psychose;
+
 import com.illposed.osc.OSCListener;
 import com.illposed.osc.OSCMessage;
 import com.illposed.osc.OSCPortIn;
@@ -21,6 +23,7 @@ public class ChaOSCclient {
 
     public ChaOSCclient(String host, int port) throws UnknownHostException, SocketException {
         portOut = new OSCPortOut(InetAddress.getByName(host), port);
+        portIn = new OSCPortIn(OSC_CLIENT_PORT);
     }
 
     public void addListener(String address, OSCListener listener) {
@@ -33,17 +36,8 @@ public class ChaOSCclient {
     }
 
     public boolean startReceiver() {
-        try {
-            portIn = new OSCPortIn(OSC_CLIENT_PORT);
-            portIn.startListening();
-
-            return changeChaoscSubscription(true);
-        } catch (SocketException e) {
-            System.out.println("could not create listening socket");
-            e.printStackTrace();
-        }
-
-        return false;
+        portIn.startListening();
+        return changeChaoscSubscription(true);
     }
 
     private boolean changeChaoscSubscription(boolean subscribe) {

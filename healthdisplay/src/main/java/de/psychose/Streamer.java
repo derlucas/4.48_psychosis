@@ -1,3 +1,5 @@
+package de.psychose;
+
 import org.jboss.netty.bootstrap.ServerBootstrap;
 import org.jboss.netty.buffer.ChannelBuffers;
 import org.jboss.netty.channel.*;
