@@ -61,21 +61,16 @@ class TextModel(QtCore.QAbstractTableModel):
         return True
 
     def removeRows(self, row, count, parent=QtCore.QModelIndex()):
-        print "removeRows", row, count
-        print map(itemgetter(0), self.text_db)
         self.beginRemoveRows(QtCore.QModelIndex(), row, row+count+1)
         for i in range(row, row+count):
-            print "del", i, self.text_db[row]
             self.text_db.pop(row)
-        print "after"
-        print map(itemgetter(0), self.text_db)
         self.endRemoveRows()
         return True
 
 
     def text_by_preview(self, preview):
-        for title, text in self.text_db:
+        for ix, (title, text) in enumerate(self.text_db):
             if title == preview:
-                return title, text
+                return ix, title, text
         return None
 

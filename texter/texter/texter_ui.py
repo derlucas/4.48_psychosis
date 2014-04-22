@@ -2,7 +2,7 @@
 
 # Form implementation generated from reading ui file 'texter3.ui'
 #
-# Created: Sat Apr 19 21:56:41 2014
+# Created: Mon Apr 21 22:38:51 2014
 #      by: PyQt4 UI code generator 4.10.3
 #
 # WARNING! All changes made in this file will be lost!
@@ -97,8 +97,7 @@ class Ui_MainWindow(object):
         brush.setStyle(QtCore.Qt.SolidPattern)
         palette.setBrush(QtGui.QPalette.Disabled, QtGui.QPalette.Link, brush)
         self.live_text.setPalette(palette)
-        self.live_text.viewport().setProperty("cursor", QtGui.QCursor(QtCore.Qt.ArrowCursor))
-        self.live_text.setAutoFillBackground(True)
+        self.live_text.setAutoFillBackground(False)
         self.live_text.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
         self.live_text.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
         self.live_text.setAcceptRichText(True)
@@ -134,8 +133,7 @@ class Ui_MainWindow(object):
         brush.setStyle(QtCore.Qt.SolidPattern)
         palette.setBrush(QtGui.QPalette.Disabled, QtGui.QPalette.Window, brush)
         self.preview_text.setPalette(palette)
-        self.preview_text.setContextMenuPolicy(QtCore.Qt.ActionsContextMenu)
-        self.preview_text.setAutoFillBackground(True)
+        self.preview_text.setAutoFillBackground(False)
         self.preview_text.setFrameShape(QtGui.QFrame.StyledPanel)
         self.preview_text.setAcceptRichText(True)
         self.preview_text.setTextInteractionFlags(QtCore.Qt.LinksAccessibleByKeyboard|QtCore.Qt.LinksAccessibleByMouse|QtCore.Qt.TextBrowserInteraction|QtCore.Qt.TextEditable|QtCore.Qt.TextEditorInteraction|QtCore.Qt.TextSelectableByKeyboard|QtCore.Qt.TextSelectableByMouse)
