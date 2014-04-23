@@ -1,0 +1,21 @@
+#!/sbin/runscript
+
+depend() {
+  need net
+  use dns localmount
+  after bootmisc
+  provide chaosc
+}
+
+
+start() {
+  ebegin "starting chaosc"
+  start-stop-daemon --start --pidfile /var/run/chaosc.pid --make-pidfile --user sarah --group sarah --background --exec /usr/bin/chaosc
+  eend $?
+}
+
+stop() {
+  ebegin "stopping chaosc"
+  start-stop-daemon --stop --quiet --pidfile /var/run/chaosc.pid
+  eend $?
+}
