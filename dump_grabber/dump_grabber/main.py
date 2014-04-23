@@ -61,7 +61,7 @@ class MainWindow(KMainWindow, Ui_MainWindow):
         self.graphics_scene = QtGui.QGraphicsScene(self)
         self.graphics_scene.setSceneRect(0,0, 775, 580)
         self.graphics_view.setScene(self.graphics_scene)
-        self.default_font = QtGui.QFont("Monospace", 14)
+        self.default_font = QtGui.QFont("Monospace", 16)
         self.default_font.setStyleHint(QtGui.QFont.Monospace)
         self.default_font.setBold(True)
         self.blue_color = QtGui.QColor(47,147,235)
@@ -291,7 +291,7 @@ class JustAHTTPServer(HTTPServer):
 
 
 def main():
-    arg_parser = ArgParser("ekgplotter")
+    arg_parser = ArgParser("dump_grabber")
     arg_parser.add_global_group()
     client_group = arg_parser.add_client_group()
     arg_parser.add_argument(client_group, '-x', "--http_host", default="::",
