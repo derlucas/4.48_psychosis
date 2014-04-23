@@ -11,6 +11,7 @@ import java.awt.event.ActionEvent;
 public class ActorDisplay {
     private final static Color onColor = Color.WHITE;
     private final static Color offColor = Color.RED;
+    private final static String offText = "no data";
 
     private JPanel actorPanel;
     private JLabel lblCaption;
@@ -78,43 +79,49 @@ public class ActorDisplay {
 
                 if (++counterTemperature > timeout) {
                     lblTemperature.setForeground(offColor);
+                    lblTemperature.setText(offText);
                 } else {
                     lblTemperature.setForeground(onColor);
                 }
 
                 if (++counterPulse > timeout) {
                     lblPulse.setForeground(offColor);
+                    lblPulse.setText(offText);
                 } else {
                     lblPulse.setForeground(onColor);
                 }
 
                 if (++counterOxy > timeout) {
                     lblOxy.setForeground(offColor);
+                    lblOxy.setText(offText);
                 } else {
                     lblOxy.setForeground(onColor);
                 }
 
                 if (++counterEkg > timeout) {
                     lblEkg.setForeground(offColor);
+                    lblEkg.setText(offText);
                 } else {
                     lblEkg.setForeground(onColor);
                 }
 
                 if (++counterEmg > timeout) {
                     lblEmg.setForeground(offColor);
+                    lblEkg.setText(offText);
                 } else {
                     lblEmg.setForeground(onColor);
                 }
 
                 if (++counterHeartbeat > timeout) {
                     lblHeartbeat.setForeground(offColor);
-                    lblHeartbeat.setText("no data");
+                    lblHeartbeat.setText(offText);
                 } else {
                     lblHeartbeat.setForeground(onColor);
                 }
 
                 if (++counterBreath > timeout) {
                     lblBreath.setForeground(offColor);
+                    lblBreath.setText(offText);
                 } else {
                     lblBreath.setForeground(onColor);
                 }
