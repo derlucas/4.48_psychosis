@@ -1,0 +1,13 @@
+<component name="libraryTable">
+  <library name="Maven: org.snmp4j:snmp4j:1.9.1f">
+    <CLASSES>
+      <root url="jar://$MAVEN_REPOSITORY$/org/snmp4j/snmp4j/1.9.1f/snmp4j-1.9.1f.jar!/" />
+    </CLASSES>
+    <JAVADOC>
+      <root url="jar://$MAVEN_REPOSITORY$/org/snmp4j/snmp4j/1.9.1f/snmp4j-1.9.1f-javadoc.jar!/" />
+    </JAVADOC>
+    <SOURCES>
+      <root url="jar://$MAVEN_REPOSITORY$/org/snmp4j/snmp4j/1.9.1f/snmp4j-1.9.1f-sources.jar!/" />
+    </SOURCES>
+  </library>
+</component>

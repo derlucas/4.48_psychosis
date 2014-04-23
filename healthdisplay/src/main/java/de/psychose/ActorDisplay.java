@@ -3,7 +3,6 @@ package de.psychose;
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.ActionEvent;
-import java.util.Random;
 
 /**
  * @author: lucas
@@ -73,13 +72,9 @@ public class ActorDisplay {
     }
 
     public ActorDisplay() {
-        final Random r = new Random();
-
         final Timer timer = new Timer(100, new AbstractAction() {
             @Override
             public void actionPerformed(ActionEvent e) {
-
-//                actorPanel.setBackground(new Color(r.nextInt(), false));
 
                 if (++counterTemperature > timeout) {
                     lblTemperature.setForeground(offColor);
@@ -113,6 +108,7 @@ public class ActorDisplay {
 
                 if (++counterHeartbeat > timeout) {
                     lblHeartbeat.setForeground(offColor);
+                    lblHeartbeat.setText("no data");
                 } else {
                     lblHeartbeat.setForeground(onColor);
                 }
@@ -122,7 +118,6 @@ public class ActorDisplay {
                 } else {
                     lblBreath.setForeground(onColor);
                 }
-
             }
         });
         timer.setRepeats(true);
