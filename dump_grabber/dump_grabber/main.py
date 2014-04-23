@@ -254,7 +254,7 @@ class MyHandler(BaseHTTPRequestHandler):
                     JpegData = None
                     buffer = None
                     img = None
-                    time.sleep(0.03)
+                    time.sleep(0.05)
 
             elif self.path.endswith(".jpeg"):
                 directory = os.path.dirname(os.path.abspath(__file__))
