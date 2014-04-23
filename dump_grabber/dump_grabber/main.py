@@ -64,6 +64,7 @@ class MainWindow(KMainWindow, Ui_MainWindow):
         self.default_font = QtGui.QFont("Monospace", 14)
         self.default_font.setStyleHint(QtGui.QFont.Monospace)
         self.default_font.setBold(True)
+        self.blue_color = QtGui.QColor(47,147,235)
         self.font_metrics = QtGui.QFontMetrics(self.default_font)
         self.line_height = self.font_metrics.height()
         self.num_lines = 775/self.line_height
@@ -72,28 +73,38 @@ class MainWindow(KMainWindow, Ui_MainWindow):
         print "font", self.default_font.family(), self.default_font.pixelSize(), self.default_font.pointSize()
         self.brush = QtGui.QBrush(QtGui.QColor(255, 255, 255))
         self.brush.setStyle(QtCore.Qt.SolidPattern)
+        self.column_width = 775 / columns
 
         self.column_count = columns
-        self.columns = [["" for j in range(self.num_lines)]
-            for i in range(columns)]
-        self.column_width = 775 / columns
-        self.column_heads = [self.num_lines - 1] * columns
+        self.columns = list()
+        for i in range(columns):
+            column = list()
+            for j in range(self.num_lines):
+                text_item = self.graphics_scene.addSimpleText("", self.default_font)
+                if column == 0:
+                    text_item.setBrush(QtCore.Qt.red)
+                elif column == 1:
+                    text_item.setBrush(QtCore.Qt.green)
+                elif column == 2:
+                    text_item.setBrush(self.blue_color)
+                text_item.setPos(j * self.line_height, i * self.column_width)
+                column.append(text_item)
+            self.columns.append(column)
         self.graphics_view.show()
 
     def add_text(self, column, text):
-        head = self.column_heads[column]
         text_item = self.graphics_scene.addSimpleText(text, self.default_font)
-        #text_item.setPen(QtCore.Qt.red)
         if column == 0:
             text_item.setBrush(QtCore.Qt.red)
         elif column == 1:
             text_item.setBrush(QtCore.Qt.green)
         elif column == 2:
-            text_item.setBrush(QtCore.Qt.blue)
-        text_item.setPos(column * self.column_width, head * self.line_height)
-        print "head", column, head
-        self.columns[column][head] = text_item
-        self.column_heads[column] = (head - 1) % self.num_lines
+            text_item.setBrush(self.blue_color)
+        old_item = self.columns[column].pop(0)
+        self.graphics_scene.removeItem(old_item)
+        self.columns[column].append(text_item)
+        for ix, text_item in enumerate(self.columns[column]):
+            text_item.setPos(column * self.column_width, ix * self.line_height)
 
 
     def render(self):
@@ -162,7 +173,7 @@ class OSCThread(threading.Thread):
 
         while self.running:
             try:
-                reads, writes, errs = select.select([self.osc_sock], [], [], 0.05)
+                reads, writes, errs = select.select([self.osc_sock], [], [], 0.01)
             except Exception, e:
                 print "select error", e
                 pass
@@ -171,15 +182,14 @@ class OSCThread(threading.Thread):
                     try:
                         osc_input, address = self.osc_sock.recvfrom(8192)
                         osc_address, typetags, messages = decode_osc(osc_input, 0, len(osc_input))
-                        print osc_address, typetags, messages
                         if osc_address.find("ekg") != -1 or osc_address.find("plot") != -1:
                             queue.put_nowait((osc_address, messages))
                     except Exception, e:
                         print "recvfrom error", e
                 else:
-                    queue.put_nowait(("/bjoern/ekg", [0]))
-                    queue.put_nowait(("/merle/ekg", [0]))
-                    queue.put_nowait(("/uwe/ekg", [0]))
+                    queue.put_nowait(("/bjoern/ekg", [random.randint(0,255)]))
+                    queue.put_nowait(("/merle/ekg", [random.randint(0,255)]))
+                    queue.put_nowait(("/uwe/ekg", [random.randint(0,255)]))
 
         self.unsubscribe_me()
         print "OSCThread is going down"
@@ -209,7 +219,7 @@ class MyHandler(BaseHTTPRequestHandler):
                 thread.daemon = True
                 thread.start()
                 window = MainWindow()
-                window.show()
+                window.hide()
 
                 self.send_response(200)
                 self.send_header("Content-Type", "multipart/x-mixed-replace; boundary=--aaboundary")
@@ -222,7 +232,6 @@ class MyHandler(BaseHTTPRequestHandler):
                     while 1:
                         try:
                             osc_address, args = queue.get_nowait()
-                            print osc_address, args
                         except Queue.Empty:
                             break
                         else:
@@ -245,6 +254,7 @@ class MyHandler(BaseHTTPRequestHandler):
                     JpegData = None
                     buffer = None
                     img = None
+                    time.sleep(0.03)
 
             elif self.path.endswith(".jpeg"):
                 directory = os.path.dirname(os.path.abspath(__file__))
