@@ -54,18 +54,12 @@ from pyqtgraph.widgets.PlotWidget import PlotWidget
 from chaosc.argparser_groups import *
 from chaosc.lib import resolve_host
 
-try:
-    from chaosc.c_osc_lib import *
-except ImportError:
-    from chaosc.osc_lib import *
-
-
 
 try:
-    from chaosc.c_osc_lib import decode_osc
+    from chaosc.c_osc_lib import OSCMessage, decode_osc
 except ImportError as e:
     print(e)
-    from chaosc.osc_lib import decode_osc
+    from chaosc.osc_lib import OSCMessage, decode_osc
 
 
 
@@ -137,7 +131,7 @@ class OSCThread(threading.Thread):
 
         while self.running:
             try:
-                reads, writes, errs = select.select([self.osc_sock], [], [], 0.05)
+                reads, writes, errs = select.select([self.osc_sock], [], [], 0.01)
             except Exception, e:
                 print "select error", e
                 pass
@@ -407,6 +401,7 @@ class MyHandler(BaseHTTPRequestHandler):
                         #s = np.clip(dt*3., 0, 1)
                         #fps = fps * (1-s) + (1.0/dt) * s
                     #print '%0.2f fps' % fps
+                    time.sleep(0.05)
 
             elif self.path.endswith(".jpeg"):
                 directory = os.path.dirname(os.path.abspath(__file__))
