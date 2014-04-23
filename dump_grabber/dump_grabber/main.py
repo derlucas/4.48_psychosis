@@ -61,7 +61,7 @@ class MainWindow(KMainWindow, Ui_MainWindow):
         self.graphics_scene = QtGui.QGraphicsScene(self)
         self.graphics_scene.setSceneRect(0,0, 775, 580)
         self.graphics_view.setScene(self.graphics_scene)
-        self.default_font = QtGui.QFont("Monospace", 16)
+        self.default_font = QtGui.QFont("Monospace", 14)
         self.default_font.setStyleHint(QtGui.QFont.Monospace)
         self.default_font.setBold(True)
         self.blue_color = QtGui.QColor(47,147,235)
@@ -182,14 +182,11 @@ class OSCThread(threading.Thread):
                     try:
                         osc_input, address = self.osc_sock.recvfrom(8192)
                         osc_address, typetags, messages = decode_osc(osc_input, 0, len(osc_input))
-                        if osc_address.find("ekg") != -1 or osc_address.find("plot") != -1:
-                            queue.put_nowait((osc_address, messages))
+                        queue.put_nowait((osc_address, messages))
                     except Exception, e:
                         print "recvfrom error", e
                 else:
-                    queue.put_nowait(("/bjoern/ekg", [random.randint(0,255)]))
-                    queue.put_nowait(("/merle/ekg", [random.randint(0,255)]))
-                    queue.put_nowait(("/uwe/ekg", [random.randint(0,255)]))
+                    pass
 
         self.unsubscribe_me()
         print "OSCThread is going down"
