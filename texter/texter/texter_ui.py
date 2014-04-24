@@ -2,7 +2,7 @@
 
 # Form implementation generated from reading ui file 'texter3.ui'
 #
-# Created: Wed Apr 16 20:48:51 2014
+# Created: Mon Apr 21 22:38:51 2014
 #      by: PyQt4 UI code generator 4.10.3
 #
 # WARNING! All changes made in this file will be lost!
@@ -57,8 +57,8 @@ class Ui_MainWindow(object):
         self.horizontalLayout = QtGui.QHBoxLayout()
         self.horizontalLayout.setObjectName(_fromUtf8("horizontalLayout"))
         self.live_text = KRichTextWidget(self.centralwidget)
-        self.live_text.setMinimumSize(QtCore.QSize(772,580))
-        self.live_text.setMaximumSize(QtCore.QSize(772,580))
+        self.live_text.setMinimumSize(QtCore.QSize(775, 578))
+        self.live_text.setMaximumSize(QtCore.QSize(775, 578))
         palette = QtGui.QPalette()
         brush = QtGui.QBrush(QtGui.QColor(0, 0, 0))
         brush.setStyle(QtCore.Qt.SolidPattern)
@@ -97,8 +97,7 @@ class Ui_MainWindow(object):
         brush.setStyle(QtCore.Qt.SolidPattern)
         palette.setBrush(QtGui.QPalette.Disabled, QtGui.QPalette.Link, brush)
         self.live_text.setPalette(palette)
-        self.live_text.viewport().setProperty("cursor", QtGui.QCursor(QtCore.Qt.BlankCursor))
-        self.live_text.setAutoFillBackground(True)
+        self.live_text.setAutoFillBackground(False)
         self.live_text.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
         self.live_text.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
         self.live_text.setAcceptRichText(True)
@@ -113,7 +112,7 @@ class Ui_MainWindow(object):
         sizePolicy.setHeightForWidth(self.preview_text.sizePolicy().hasHeightForWidth())
         self.preview_text.setSizePolicy(sizePolicy)
         self.preview_text.setMinimumSize(QtCore.QSize(300, 577))
-        self.preview_text.setMaximumSize(QtCore.QSize(772,580))
+        self.preview_text.setMaximumSize(QtCore.QSize(769, 577))
         palette = QtGui.QPalette()
         brush = QtGui.QBrush(QtGui.QColor(0, 0, 0))
         brush.setStyle(QtCore.Qt.SolidPattern)
@@ -134,8 +133,7 @@ class Ui_MainWindow(object):
         brush.setStyle(QtCore.Qt.SolidPattern)
         palette.setBrush(QtGui.QPalette.Disabled, QtGui.QPalette.Window, brush)
         self.preview_text.setPalette(palette)
-        self.preview_text.setContextMenuPolicy(QtCore.Qt.ActionsContextMenu)
-        self.preview_text.setAutoFillBackground(True)
+        self.preview_text.setAutoFillBackground(False)
         self.preview_text.setFrameShape(QtGui.QFrame.StyledPanel)
         self.preview_text.setAcceptRichText(True)
         self.preview_text.setTextInteractionFlags(QtCore.Qt.LinksAccessibleByKeyboard|QtCore.Qt.LinksAccessibleByMouse|QtCore.Qt.TextBrowserInteraction|QtCore.Qt.TextEditable|QtCore.Qt.TextEditorInteraction|QtCore.Qt.TextSelectableByKeyboard|QtCore.Qt.TextSelectableByMouse)
