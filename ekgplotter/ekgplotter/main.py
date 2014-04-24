@@ -29,6 +29,7 @@ from  datetime import datetime
 import threading
 import Queue
 import traceback
+import logging
 import numpy as np
 import string
 import time
@@ -52,20 +53,18 @@ import pyqtgraph as pg
 from pyqtgraph.widgets.PlotWidget import PlotWidget
 
 from chaosc.argparser_groups import *
-from chaosc.lib import resolve_host
+from chaosc.lib import logger, resolve_host
+
+
+fh = logging.FileHandler(os.path.expanduser("~/.chaosc/ekgplotter.log"))
+fh.setLevel(logging.DEBUG)
+logger.addHandler(fh)
 
 try:
-    from chaosc.c_osc_lib import *
-except ImportError:
-    from chaosc.osc_lib import *
-
-
-
-try:
-    from chaosc.c_osc_lib import decode_osc
+    from chaosc.c_osc_lib import OSCMessage, decode_osc
 except ImportError as e:
     print(e)
-    from chaosc.osc_lib import decode_osc
+    from chaosc.osc_lib import OSCMessage, decode_osc
 
 
 
@@ -98,7 +97,7 @@ class OSCThread(threading.Thread):
         print "%s: starting up osc receiver on '%s:%d'" % (
             datetime.now().strftime("%x %X"), self.client_address[0], self.client_address[1])
 
-        self.subscribe_me()
+        #self.subscribe_me()
 
     def subscribe_me(self):
         """Use this procedure for a quick'n dirty subscription to your chaosc instance.
@@ -137,7 +136,7 @@ class OSCThread(threading.Thread):
 
         while self.running:
             try:
-                reads, writes, errs = select.select([self.osc_sock], [], [], 0.05)
+                reads, writes, errs = select.select([self.osc_sock], [], [], 0.01)
             except Exception, e:
                 print "select error", e
                 pass
@@ -146,16 +145,15 @@ class OSCThread(threading.Thread):
                     try:
                         osc_input, address = self.osc_sock.recvfrom(8192)
                         osc_address, typetags, messages = decode_osc(osc_input, 0, len(osc_input))
-                        if osc_address.find("ekg") != -1 or osc_address.find("plot") != -1:
-                            queue.put_nowait((osc_address, messages))
+                        queue.put_nowait((osc_address, messages))
                     except Exception, e:
                         print "recvfrom error", e
-                else:
-                    queue.put_nowait(("/bjoern/ekg", [0]))
-                    queue.put_nowait(("/merle/ekg", [0]))
-                    queue.put_nowait(("/uwe/ekg", [0]))
+                #else:
+                    #queue.put_nowait(("/bjoern/ekg", [0]))
+                    #queue.put_nowait(("/merle/ekg", [0]))
+                    #queue.put_nowait(("/uwe/ekg", [0]))
 
-        self.unsubscribe_me()
+        #self.unsubscribe_me()
         print "OSCThread is going down"
 
 
@@ -252,7 +250,7 @@ class EkgPlot(object):
         self.plot.showGrid(False, False)
         self.plot.setYRange(0, 255)
         self.plot.setXRange(0, num_data)
-        self.plot.resize(1280, 720)
+        self.plot.resize(768, 576)
 
         ba = self.plot.getAxis("bottom")
         bl = self.plot.getAxis("left")
@@ -386,10 +384,12 @@ class MyHandler(BaseHTTPRequestHandler):
                             plotter.update(osc_address, args[0])
 
                     exporter = pg.exporters.ImageExporter.ImageExporter(plotter.plot.plotItem)
+                    exporter.parameters()['width'] = 768
                     img = exporter.export("tmpfile", True)
                     buffer = QBuffer()
                     buffer.open(QIODevice.WriteOnly)
-                    img.save(buffer, "JPG", 100)
+                    img.save(buffer, "JPG")
+                    img.save("/tmp/test2.jpg", "JPG")
 
                     JpegData = buffer.data()
                     self.wfile.write("--aaboundary\r\nContent-Type: image/jpeg\r\nContent-length: %d\r\n\r\n%s\r\n\r\n\r\n" % (len(JpegData), JpegData))
@@ -407,6 +407,7 @@ class MyHandler(BaseHTTPRequestHandler):
                         #s = np.clip(dt*3., 0, 1)
                         #fps = fps * (1-s) + (1.0/dt) * s
                     #print '%0.2f fps' % fps
+                    time.sleep(0.05)
 
             elif self.path.endswith(".jpeg"):
                 directory = os.path.dirname(os.path.abspath(__file__))
