@@ -97,7 +97,7 @@ class OSCThread(threading.Thread):
         print "%s: starting up osc receiver on '%s:%d'" % (
             datetime.now().strftime("%x %X"), self.client_address[0], self.client_address[1])
 
-        #self.subscribe_me()
+        self.subscribe_me()
 
     def subscribe_me(self):
         """Use this procedure for a quick'n dirty subscription to your chaosc instance.
@@ -148,12 +148,12 @@ class OSCThread(threading.Thread):
                         queue.put_nowait((osc_address, messages))
                     except Exception, e:
                         print "recvfrom error", e
-                #else:
-                    #queue.put_nowait(("/bjoern/ekg", [0]))
-                    #queue.put_nowait(("/merle/ekg", [0]))
-                    #queue.put_nowait(("/uwe/ekg", [0]))
+                else:
+                    queue.put_nowait(("/bjoern/ekg", [0]))
+                    queue.put_nowait(("/merle/ekg", [0]))
+                    queue.put_nowait(("/uwe/ekg", [0]))
 
-        #self.unsubscribe_me()
+        self.unsubscribe_me()
         print "OSCThread is going down"
 
 
@@ -245,6 +245,7 @@ class EkgPlot(object):
     def __init__(self, actor_names, num_data, colors):
         self.plot = pg.PlotWidget()
         self.plot.hide()
+        #self.plot.show()
         #self.plot.setLabel('left', "<h2>Amplitude</h2>")
         #self.plot.setLabel('bottom', "<h2><sup>Time</sup></h2>")
         self.plot.showGrid(False, False)
@@ -256,6 +257,8 @@ class EkgPlot(object):
         bl = self.plot.getAxis("left")
         ba.setTicks([])
         bl.setTicks([])
+        ba.hide()
+        bl.hide()
         self.active_actors = list()
 
         self.actors = dict()
