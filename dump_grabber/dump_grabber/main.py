@@ -2,42 +2,61 @@
 # -*- coding: utf-8 -*-
 
 
-import sys, os, random
+# This file is part of chaosc and psychosis
+#
+# chaosc is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# chaosc is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with chaosc.  If not, see <http://www.gnu.org/licenses/>.
+#
+# Copyright (C) 2014 Stefan Kögl
 
-from PyQt4 import QtCore, QtGui
 
-from PyQt4.QtCore import QBuffer, QByteArray, QIODevice
+from __future__ import absolute_import
 
-from dump_grabber_ui import Ui_MainWindow
+import os
+
+from BaseHTTPServer import BaseHTTPRequestHandler, HTTPServer
+from chaosc.argparser_groups import *
+from chaosc.lib import logger, resolve_host
+from collections import deque
+from datetime import datetime
+from dump_grabber.dump_grabber_ui import Ui_MainWindow
+from os import curdir, sep
 from PyKDE4.kdecore import ki18n, KCmdLineArgs, KAboutData
 from PyKDE4.kdeui import KMainWindow, KApplication
-
-from  datetime import datetime
-import threading
-import Queue
-import traceback
-import numpy as np
-import string
-import time
-import random
-import socket
-import os.path
-from os import curdir, sep
-from BaseHTTPServer import BaseHTTPRequestHandler, HTTPServer
+from PyQt4 import QtCore, QtGui
+from PyQt4.QtCore import QBuffer, QByteArray, QIODevice
 from SocketServer import ThreadingMixIn, ForkingMixIn
-import select
+
+import logging
+import numpy as np
+
+import os.path
+import Queue
+import random
 import re
-
-from collections import deque
-
-from chaosc.argparser_groups import *
-from chaosc.lib import resolve_host
+import select
+import socket
+import string
+import sys
+import threading
+import time
+import traceback
 
 try:
     from chaosc.c_osc_lib import OSCMessage, decode_osc
 except ImportError as e:
-    print(e)
     from chaosc.osc_lib import OSCMessage, decode_osc
+
 
 
 appName     = "dump_grabber"
@@ -50,6 +69,11 @@ aboutData = KAboutData(appName, catalog, programName, version)
 KCmdLineArgs.init (sys.argv, aboutData)
 
 app = KApplication()
+
+fh = logging.FileHandler(os.path.expanduser("~/.chaosc/dump_grabber.log"))
+fh.setLevel(logging.DEBUG)
+logger.addHandler(fh)
+
 class MainWindow(KMainWindow, Ui_MainWindow):
     def __init__(self, parent=None, columns=3):
         super(MainWindow, self).__init__(parent)
@@ -70,7 +94,6 @@ class MainWindow(KMainWindow, Ui_MainWindow):
         self.num_lines = 775/self.line_height
 
         self.graphics_scene.setFont(self.default_font)
-        print "font", self.default_font.family(), self.default_font.pixelSize(), self.default_font.pointSize()
         self.brush = QtGui.QBrush(QtGui.QColor(255, 255, 255))
         self.brush.setStyle(QtCore.Qt.SolidPattern)
         self.column_width = 775 / columns
@@ -108,7 +131,7 @@ class MainWindow(KMainWindow, Ui_MainWindow):
 
 
     def render(self):
-        image = QtGui.QImage(768, 576, QtGui.QImage.Format_ARGB32_Premultiplied)
+        image = QtGui.QImage(768, 576, QtGui.QImage.Format_ARGB32)
         image.fill(QtCore.Qt.black)
         painter = QtGui.QPainter(image)
         #painter.setPen(QtCore.Qt.white)
@@ -131,8 +154,7 @@ class OSCThread(threading.Thread):
         self.osc_sock.bind(self.client_address)
         self.osc_sock.setblocking(0)
 
-        print "%s: starting up osc receiver on '%s:%d'" % (
-            datetime.now().strftime("%x %X"), self.client_address[0], self.client_address[1])
+        logger.info("starting up osc receiver on '%s:%d'", self.client_address[0], self.client_address[1])
 
         self.subscribe_me()
 
@@ -148,7 +170,7 @@ class OSCThread(threading.Thread):
         :param token: token to get authorized for subscription
         :type token: str
         """
-        print "%s: subscribing to '%s:%d' with label %r" % (datetime.now().strftime("%x %X"), self.chaosc_address[0], self.chaosc_address[1], self.args.subscriber_label)
+        logger.info("%s: subscribing to '%s:%d' with label %r", datetime.now().strftime("%x %X"), self.chaosc_address[0], self.chaosc_address[1], self.args.subscriber_label)
         msg = OSCMessage("/subscribe")
         msg.appendTypedArg(self.client_address[0], "s")
         msg.appendTypedArg(self.client_address[1], "i")
@@ -162,7 +184,7 @@ class OSCThread(threading.Thread):
         if self.args.keep_subscribed:
             return
 
-        print "%s: unsubscribing from '%s:%d'" % (datetime.now().strftime("%x %X"), self.chaosc_address[0], self.chaosc_address[1])
+        logger.info("unsubscribing from '%s:%d'", self.chaosc_address[0], self.chaosc_address[1])
         msg = OSCMessage("/unsubscribe")
         msg.appendTypedArg(self.client_address[0], "s")
         msg.appendTypedArg(self.client_address[1], "i")
@@ -175,7 +197,6 @@ class OSCThread(threading.Thread):
             try:
                 reads, writes, errs = select.select([self.osc_sock], [], [], 0.01)
             except Exception, e:
-                print "select error", e
                 pass
             else:
                 if reads:
@@ -184,12 +205,12 @@ class OSCThread(threading.Thread):
                         osc_address, typetags, messages = decode_osc(osc_input, 0, len(osc_input))
                         queue.put_nowait((osc_address, messages))
                     except Exception, e:
-                        print "recvfrom error", e
+                        pass
                 else:
                     pass
 
         self.unsubscribe_me()
-        print "OSCThread is going down"
+        logger.info("OSCThread is going down")
 
 
 queue = Queue.Queue()
@@ -242,8 +263,8 @@ class MyHandler(BaseHTTPRequestHandler):
                     img = window.render()
                     buffer = QBuffer()
                     buffer.open(QIODevice.WriteOnly)
-                    img.save(buffer, "JPG", 100)
-                    img.save("/tmp/test.jpg", "JPG")
+                    img.save(buffer, "JPG", 50)
+                    img.save("/tmp/test.jpg", "JPG", 50)
 
                     JpegData = buffer.data()
                     self.wfile.write("--aaboundary\r\nContent-Type: image/jpeg\r\nContent-length: %d\r\n\r\n%s\r\n\r\n\r\n" % (len(JpegData), JpegData))
@@ -251,7 +272,7 @@ class MyHandler(BaseHTTPRequestHandler):
                     JpegData = None
                     buffer = None
                     img = None
-                    time.sleep(0.05)
+                    time.sleep(0.06)
 
             elif self.path.endswith(".jpeg"):
                 directory = os.path.dirname(os.path.abspath(__file__))
@@ -262,25 +283,26 @@ class MyHandler(BaseHTTPRequestHandler):
                 self.wfile.write(data)
             return
         except (KeyboardInterrupt, SystemError):
-            print "queue size", queue.qsize()
+            #print "queue size", queue.qsize()
             if hasattr(self, "thread") and self.thread is not None:
                 self.thread.running = False
                 self.thread.join()
                 self.thread = None
         except IOError, e:
-            print "ioerror", e, e[0]
-            print dir(e)
+            #print "ioerror", e, e[0]
+            #print dir(e)
             if e[0] in (32, 104):
                 if hasattr(self, "thread") and self.thread is not None:
                     self.thread.running = False
                     self.thread.join()
                     self.thread = None
             else:
-                print '-'*40
-                print 'Exception happened during processing of request from'
-                traceback.print_exc() # XXX But this goes to stderr!
-                print '-'*40
-                self.send_error(404,'File Not Found: %s' % self.path)
+                pass
+                #print '-'*40
+                #print 'Exception happened during processing of request from'
+                #traceback.print_exc() # XXX But this goes to stderr!
+                #print '-'*40
+                #self.send_error(404,'File Not Found: %s' % self.path)
 
 
 class JustAHTTPServer(HTTPServer):
@@ -293,8 +315,8 @@ def main():
     client_group = arg_parser.add_client_group()
     arg_parser.add_argument(client_group, '-x', "--http_host", default="::",
         help='my host, defaults to "::"')
-    arg_parser.add_argument(client_group, '-X', "--http_port", default=9000,
-        type=int, help='my port, defaults to 9000')
+    arg_parser.add_argument(client_group, '-X', "--http_port", default=9001,
+        type=int, help='my port, defaults to 9001')
     arg_parser.add_chaosc_group()
     arg_parser.add_subscriber_group()
     args = arg_parser.finalize()
@@ -304,16 +326,9 @@ def main():
     server = JustAHTTPServer((http_host, http_port), MyHandler)
     server.address_family = args.address_family
     server.args = args
-    print "%s: starting up http server on '%s:%d'" % (
-        datetime.now().strftime("%x %X"), http_host, http_port)
+    logger.info("starting up http server on '%s:%d'", http_host, http_port)
 
-    try:
-        server.serve_forever()
-    except KeyboardInterrupt:
-        print '^C received, shutting down server'
-        server.socket.close()
-        sys.exit(0)
-
+    server.serve_forever()
 
 if ( __name__ == '__main__' ):
     main()
