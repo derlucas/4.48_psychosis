@@ -67,6 +67,8 @@ public class SnmpStatClient {
                     }
                 }
             }
+
+            snmp.close();
         } catch (IOException e) {
             e.printStackTrace();
         }

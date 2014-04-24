@@ -107,7 +107,7 @@ public class ActorDisplay {
 
                 if (++counterEmg > timeout) {
                     lblEmg.setForeground(offColor);
-                    lblEkg.setText(offText);
+                    lblEmg.setText(offText);
                 } else {
                     lblEmg.setForeground(onColor);
                 }
