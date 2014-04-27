@@ -261,7 +261,6 @@ class MainWindow(KMainWindow, Ui_MainWindow):
         self.publish_action.triggered.connect(self.slot_publish)
         self.clear_live_action.triggered.connect(self.slot_clear_live)
         self.clear_preview_action.triggered.connect(self.slot_clear_preview)
-        #self.remove_item_button.triggered.connect(self.slot_removeItem)
         self.text_combo.triggered[int].connect(self.slot_load_preview_text)
 
         app.focusChanged.connect(self.focusChanged)
@@ -535,13 +534,6 @@ class MainWindow(KMainWindow, Ui_MainWindow):
             pass
 
 
-    def slot_toggleToolbox(self, index):
-        if index == 0:
-            self.toolBar.setEnabled(True)
-        else:
-            self.toolBar.setEnabled(False)
-
-
     def slot_publish(self):
         if self.is_animate:
             self.animation.start_animation(self.preview_text, self.live_text, 0)
@@ -596,6 +588,7 @@ class MainWindow(KMainWindow, Ui_MainWindow):
         self.preview_text.clear()
         self.slot_set_preview_defaults()
 
+
     def fill_combo_box(self):
         self.text_combo.clear()
         for preview, text in self.model.text_db:
@@ -603,20 +596,6 @@ class MainWindow(KMainWindow, Ui_MainWindow):
 
         self.text_combo.setCurrentItem(0)
         self.slot_load_preview_text(0)
-
-
-    def slot_removeItem(self):
-        text = self.edit_item_selection.currentText()
-        index = self.edit_item_selection.currentIndex()
-        title = text.split(": ")[1]
-        del self.items[title]
-        self.edit_item_selection.removeItem(index)
-        new_index = self.edit_item_selection.currentIndex()
-        if new_index != -1:
-            self.slot_editLoadItem()
-        else:
-            self.item_title.clear()
-            self.item_position_input.setValue(0)
 
 
     def slot_load_preview_text(self, index):
