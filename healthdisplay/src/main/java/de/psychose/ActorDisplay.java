@@ -3,7 +3,6 @@ package de.psychose;
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.ActionEvent;
-import java.util.Random;
 
 /**
  * @author: lucas
@@ -12,6 +11,7 @@ import java.util.Random;
 public class ActorDisplay {
     private final static Color onColor = Color.WHITE;
     private final static Color offColor = Color.RED;
+    private final static String offText = "no data";
 
     private JPanel actorPanel;
     private JLabel lblCaption;
@@ -73,56 +73,58 @@ public class ActorDisplay {
     }
 
     public ActorDisplay() {
-        final Random r = new Random();
-
         final Timer timer = new Timer(100, new AbstractAction() {
             @Override
             public void actionPerformed(ActionEvent e) {
 
-//                actorPanel.setBackground(new Color(r.nextInt(), false));
-
                 if (++counterTemperature > timeout) {
                     lblTemperature.setForeground(offColor);
+                    lblTemperature.setText(offText);
                 } else {
                     lblTemperature.setForeground(onColor);
                 }
 
                 if (++counterPulse > timeout) {
                     lblPulse.setForeground(offColor);
+                    lblPulse.setText(offText);
                 } else {
                     lblPulse.setForeground(onColor);
                 }
 
                 if (++counterOxy > timeout) {
                     lblOxy.setForeground(offColor);
+                    lblOxy.setText(offText);
                 } else {
                     lblOxy.setForeground(onColor);
                 }
 
                 if (++counterEkg > timeout) {
                     lblEkg.setForeground(offColor);
+                    lblEkg.setText(offText);
                 } else {
                     lblEkg.setForeground(onColor);
                 }
 
                 if (++counterEmg > timeout) {
                     lblEmg.setForeground(offColor);
+                    lblEmg.setText(offText);
                 } else {
                     lblEmg.setForeground(onColor);
                 }
 
                 if (++counterHeartbeat > timeout) {
                     lblHeartbeat.setForeground(offColor);
+                    lblHeartbeat.setText(offText);
                 } else {
                     lblHeartbeat.setForeground(onColor);
                 }
 
                 if (++counterBreath > timeout) {
                     lblBreath.setForeground(offColor);
+                    lblBreath.setText(offText);
                 } else {
                     lblBreath.setForeground(onColor);
                 }
-
             }
         });
         timer.setRepeats(true);

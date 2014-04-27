@@ -109,6 +109,63 @@ class TextSorterDialog(QtGui.QWidget, Ui_TextSorterDialog):
         self.text_list.setCurrentIndex(index)
         self.text_list.clicked.emit(index)
 
+class FadeAnimation(QtCore.QObject):
+    animation_started = QtCore.pyqtSignal()
+    animation_finished = QtCore.pyqtSignal()
+    animation_stopped = QtCore.pyqtSignal()
+
+    def __init__(self, live_text, fade_steps=6, parent=None):
+        super(FadeAnimation, self).__init__(parent)
+        self.live_text = live_text
+        self.fade_steps = fade_steps
+        self.current_alpha = 255
+        self.timer = None
+    
+    
+    def start_animation(self):
+        print "start_animation"
+        self.animation_started.emit()
+
+        if self.current_alpha == 255:
+            self.fade_delta = 255 / self.fade_steps
+        else:
+            self.fade_delta = -255 / self.fade_steps
+        self.timer = QtCore.QTimer(self)
+        self.timer.timeout.connect(self.slot_animate)
+        self.timer.start(100)
+
+
+    def slot_animate(self):
+        print "slot_animate"
+        print "current_alpha", self.current_alpha
+        if self.fade_delta > 0:
+            if self.current_alpha > 0:
+                self.live_text.setStyleSheet("color:%d, %d, %d;" % (self.current_alpha, self.current_alpha,self.current_alpha))
+                self.current_alpha -= self.fade_delta
+            else:
+                self.live_text.setStyleSheet("color:black;")
+                self.current_alpha = 0
+                self.timer.stop()
+                self.timer.timeout.disconnect(self.slot_animate)
+                self.timer.deleteLater()
+                self.timer = None
+                self.animation_finished.emit()
+                print "animation_finished"
+        else:
+            if self.current_alpha < 255:
+                self.live_text.setStyleSheet("color:%d,%d, %d;" % (self.current_alpha, self.current_alpha,self.current_alpha))
+                self.current_alpha -= self.fade_delta
+            else:
+                self.live_text.setStyleSheet("color:white")
+                self.current_alpha = 255
+                self.timer.stop()
+                self.timer.timeout.disconnect(self.slot_animate)
+                self.timer.deleteLater()
+                self.timer = None
+                self.animation_finished.emit()
+                print "animation_finished"
+
+    
 
 class TextAnimation(QtCore.QObject):
     animation_started = QtCore.pyqtSignal()
@@ -229,10 +286,13 @@ class MainWindow(KMainWindow, Ui_MainWindow):
         self.animation = TextAnimation(self)
         self.db_dirty = False
         self.is_animate = False
+        self.fade_animation = None
 
         self.is_auto_publish = False
 
         self.setupUi(self)
+        
+        self.fade_animation = FadeAnimation(self.live_text, 6, self)
 
         self.font = QtGui.QFont("monospace", self.default_size)
         self.font.setStyleHint(QtGui.QFont.TypeWriter)
@@ -273,6 +333,7 @@ class MainWindow(KMainWindow, Ui_MainWindow):
         self.preview_size_action.triggered[QtGui.QAction].connect(self.slot_preview_font_size)
         self.live_size_action.triggered[QtGui.QAction].connect(self.slot_live_font_size)
 
+        self.fade_action.triggered.connect(self.slot_fade)
         self.next_action.triggered.connect(self.slot_next_item)
         self.previous_action.triggered.connect(self.slot_previous_item)
 
@@ -432,6 +493,12 @@ class MainWindow(KMainWindow, Ui_MainWindow):
 
         spacer = KToolBarSpacerAction(self.action_collection)
         self.action_collection.addAction("1_spacer", spacer)
+        
+        self.fade_action = self.action_collection.addAction("fade_action")
+        #icon = QtGui.QIcon.fromTheme(_fromUtf8("go-previous-view-page"))
+        #self.fade_action.setIcon(icon)
+        self.fade_action.setIconText("fade")
+        self.fade_action.setShortcut(KShortcut(QtGui.QKeySequence(QtCore.Qt.ALT + QtCore.Qt.Key_F)), KAction.ShortcutTypes(KAction.ActiveShortcut | KAction.DefaultShortcut))
 
         self.previous_action = self.action_collection.addAction("previous_action")
         icon = QtGui.QIcon.fromTheme(_fromUtf8("go-previous-view-page"))
@@ -587,6 +654,10 @@ class MainWindow(KMainWindow, Ui_MainWindow):
     def slot_clear_preview(self):
         self.preview_text.clear()
         self.slot_set_preview_defaults()
+    
+    def slot_fade(self):
+        if self.fade_animation.timer is None:
+            self.fade_animation.start_animation()
 
 
     def fill_combo_box(self):

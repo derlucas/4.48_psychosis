@@ -17,6 +17,7 @@ import java.util.Date;
  */
 public class MainForm {
     private ChaOSCclient osCclient;
+    private SnmpStatClient snmpStatClient;
 
     private JPanel mainPanel;
     private ActorDisplay actor1;
@@ -27,8 +28,12 @@ public class MainForm {
     private int totalMessageCount = 0;
     private int messagesTempCounter = 0;
 
-    public MainForm(ChaOSCclient chaOSCclient) {
-        osCclient = chaOSCclient;
+    private long totalTraffic = 0;
+    private long lastTraffic = 0;
+
+    public MainForm(final ChaOSCclient chaOSCclient, final SnmpStatClient snmpStatClient) {
+        this.osCclient = chaOSCclient;
+        this.snmpStatClient = snmpStatClient;
 
         addActor("merle", "Proband 1", actor1);
         addActor("uwe", "Proband 2", actor2);
@@ -46,6 +51,18 @@ public class MainForm {
         });
         timer.setRepeats(true);
         timer.start();
+
+        final Timer snmpTimer = new Timer(5000, new AbstractAction() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                totalTraffic = snmpStatClient.getTrafficSum();
+                statDisplay.setTotalTraffic(String.valueOf(totalTraffic / 1024));
+                statDisplay.setBandwidth(String.valueOf((totalTraffic - lastTraffic) / 1024 / 5));
+                lastTraffic = totalTraffic;
+            }
+        });
+        snmpTimer.setRepeats(true);
+        snmpTimer.start();
     }
 
 
@@ -56,7 +73,7 @@ public class MainForm {
             public void acceptMessage(Date time, OSCMessage message) {
                 if (message.getArguments().length == 3) {
                     totalMessageCount++;
-                    actorDisplay.setHeartbeat(message.getArguments()[0].toString());
+                    actorDisplay.setHeartbeat(message.getArguments()[0].toString().equals("0") ? "Systole" : "Diastole");
                     actorDisplay.setPulse(message.getArguments()[1].toString());
                     actorDisplay.setOxy(message.getArguments()[2].toString());
                 }
@@ -111,7 +128,8 @@ public class MainForm {
 
         try {
             final ChaOSCclient chaOSCclient = new ChaOSCclient(host, port);
-            final MainForm mainForm = new MainForm(chaOSCclient);
+            final SnmpStatClient snmp = new SnmpStatClient("switch/161");
+            final MainForm mainForm = new MainForm(chaOSCclient, snmp);
             final JFrame frame = new JFrame("MainForm");
             frame.setContentPane(mainForm.mainPanel);
             frame.setResizable(false);

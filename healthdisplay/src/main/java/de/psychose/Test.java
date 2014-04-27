@@ -27,6 +27,13 @@ public class Test {
 
     public static void main(String[] args) throws Exception {
 
+        SnmpStatClient snmpStatClient = new SnmpStatClient("switch/161");
+
+        System.out.println(snmpStatClient.getTrafficSum() / 1024 / 1024 + "MB");
+
+
+        if(true) return;
+
         Enumeration<NetworkInterface> nets = NetworkInterface.getNetworkInterfaces();
         for (NetworkInterface netint : Collections.list(nets)) {
             displayInterfaceInformation(netint);

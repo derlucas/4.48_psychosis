@@ -119,7 +119,6 @@ class OSCThread(threading.Thread):
                     except Exception, e:
                         logging.info(e)
 
-
         self.unsubscribe_me()
         self.osc_sock.close()
         logging.info("OSCThread is going down")
