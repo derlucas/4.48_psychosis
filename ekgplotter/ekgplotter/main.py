@@ -27,31 +27,22 @@ from __future__ import absolute_import
 from BaseHTTPServer import BaseHTTPRequestHandler, HTTPServer
 from chaosc.argparser_groups import *
 from chaosc.lib import logger, resolve_host
-from collections import deque, defaultdict
 from datetime import datetime
 from operator import attrgetter
-from os import curdir, sep
 from PyQt4 import QtGui, QtCore
 from PyQt4.QtCore import QBuffer, QByteArray, QIODevice
 from SocketServer import ThreadingMixIn, ForkingMixIn
-import cPickle
+
 import logging
 import numpy as np
 import os.path
 import pyqtgraph as pg
 import Queue
-import random
 import re
 import select
 import socket
-import string
 import threading
 import time
-import traceback
-
-fh = logging.FileHandler(os.path.expanduser("~/.chaosc/ekgplotter.log"))
-fh.setLevel(logging.DEBUG)
-logger.addHandler(fh)
 
 
 try:
@@ -75,13 +66,13 @@ class OSCThread(threading.Thread):
         self.osc_sock.bind(self.client_address)
         self.osc_sock.setblocking(0)
 
-        logging.info("%s: starting up osc receiver on '%s:%d'",
+        logger.info("%s: starting up osc receiver on '%s:%d'",
             datetime.now().strftime("%x %X"), self.client_address[0], self.client_address[1])
 
         self.subscribe_me()
 
     def subscribe_me(self):
-        logging.info("%s: subscribing to '%s:%d' with label %r", datetime.now().strftime("%x %X"), self.chaosc_address[0], self.chaosc_address[1], self.args.subscriber_label)
+        logger.info("%s: subscribing to '%s:%d' with label %r", datetime.now().strftime("%x %X"), self.chaosc_address[0], self.chaosc_address[1], self.args.subscriber_label)
         msg = OSCMessage("/subscribe")
         msg.appendTypedArg(self.client_address[0], "s")
         msg.appendTypedArg(self.client_address[1], "i")
@@ -95,7 +86,7 @@ class OSCThread(threading.Thread):
         if self.args.keep_subscribed:
             return
 
-        logging.info("%s: unsubscribing from '%s:%d'", datetime.now().strftime("%x %X"), self.chaosc_address[0], self.chaosc_address[1])
+        logger.info("%s: unsubscribing from '%s:%d'", datetime.now().strftime("%x %X"), self.chaosc_address[0], self.chaosc_address[1])
         msg = OSCMessage("/unsubscribe")
         msg.appendTypedArg(self.client_address[0], "s")
         msg.appendTypedArg(self.client_address[1], "i")
@@ -117,11 +108,11 @@ class OSCThread(threading.Thread):
                         osc_address, typetags, messages = decode_osc(osc_input, 0, len(osc_input))
                         queue.put_nowait((osc_address, messages))
                     except Exception, e:
-                        logging.info(e)
+                        logger.info(e)
 
         self.unsubscribe_me()
         self.osc_sock.close()
-        logging.info("OSCThread is going down")
+        logger.info("OSCThread is going down")
 
 
 queue = Queue.Queue()
@@ -329,12 +320,7 @@ class MyHandler(BaseHTTPRequestHandler):
                     self.thread.join()
                     self.thread = None
             else:
-                logging.info('-'*40)
-                logging.info('Exception happened during processing of request from')
-                logging.exception(e)
-                logging.info('-'*40)
-                self.send_error(404,'File Not Found: %s' % self.path)
-            raise e
+                pass
 
 
 class JustAHTTPServer(HTTPServer):
@@ -353,24 +339,19 @@ def main():
     arg_parser.add_subscriber_group()
     args = arg_parser.finalize()
 
-    if not args.background:
-        ch = logging.StreamHandler()
-        ch.setLevel(logging.DEBUG)
-        logger.addHandler(ch)
-
-
+ 
     http_host, http_port = resolve_host(args.http_host, args.http_port, args.address_family)
 
     server = JustAHTTPServer((http_host, http_port), MyHandler)
     server.address_family = args.address_family
     server.args = args
-    logging.info("%s: starting up http server on '%s:%d'",
+    logger.info("%s: starting up http server on '%s:%d'",
         datetime.now().strftime("%x %X"), http_host, http_port)
 
     try:
         server.serve_forever()
     except KeyboardInterrupt:
-        logging.info('^C received, shutting down server')
+        logger.info('^C received, shutting down server')
         server.socket.close()
         sys.exit(0)
 

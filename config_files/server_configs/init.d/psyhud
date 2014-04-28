@@ -1,0 +1,22 @@
+#!/sbin/runscript
+
+depend() {
+  need net
+  use dns localmount
+  after bootmisc
+  provide psydisplay
+}
+
+
+start() {
+  ebegin "starting psydisplay"
+  start-stop-daemon --start --pidfile /var/run/psydisplay.pid --make-pidfile --user sarah --group sarah --background --exec /usr/bin/psydisplay
+  eend $?
+}
+
+stop() {
+  ebegin "stopping psydisplay"
+  start-stop-daemon --stop --quiet --pidfile /var/run/psydisplay.pid
+  eend $?
+}
+

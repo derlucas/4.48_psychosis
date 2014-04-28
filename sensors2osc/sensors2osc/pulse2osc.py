@@ -20,7 +20,7 @@
 
 from __future__ import absolute_import
 
-import time, select
+import time, select, sys
 from datetime import datetime
 
 from sensors2osc.common import *
@@ -61,7 +61,7 @@ class RingBuffer(object):
 
 
 def main():
-    platform = init("pulse2osc")
+    platform = init()
 
     actor = platform.args.actor
 
@@ -102,7 +102,7 @@ def main():
                     osc_message.appendTypedArg(1, "i")
                     osc_message.appendTypedArg(heart_rate, "i")
                     osc_message.appendTypedArg(o2, "i")
-                    platform.osc_sock.sendall(osc_message.encode_osc())
+                    platform.osc_sock.sendto(osc_message.encode_osc(), platform.remote)
                     print "on heartbeat", datetime.now(), heart_signal, heart_rate, o2, pulse
                 except socket.error, msg:
                     print "cannot connect to chaosc"
@@ -115,7 +115,7 @@ def main():
                     osc_message.appendTypedArg(0, "i")
                     osc_message.appendTypedArg(heart_rate, "i")
                     osc_message.appendTypedArg(o2, "i")
-                    platform.osc_sock.sendall(osc_message.encode_osc())
+                    platform.osc_sock.sendto(osc_message.encode_osc(), platform.remote)
                 except socket.error, msg:
                     print "cannot connect to chaosc"
                     continue

@@ -19,54 +19,33 @@
 #
 # Copyright (C) 2014 Stefan Kögl
 
-
 from __future__ import absolute_import
 
-from BaseHTTPServer import BaseHTTPRequestHandler, HTTPServer
-from chaosc.argparser_groups import *
-from chaosc.lib import logger, resolve_host
-from collections import deque
-from datetime import datetime
-from dump_grabber.dump_grabber_ui import Ui_MainWindow
-from os import curdir, sep
-from PyQt4 import QtCore, QtGui
-from PyQt4.QtCore import QBuffer, QByteArray, QIODevice
-from SocketServer import ThreadingMixIn, ForkingMixIn
-
 import logging
-import numpy as np
 import os
 import os.path
 import Queue
-import random
 import re
 import select
 import socket
-import string
 import sys
 import threading
 import time
-import traceback
+
+from datetime import datetime
+from BaseHTTPServer import BaseHTTPRequestHandler, HTTPServer
+from chaosc.argparser_groups import *
+from chaosc.lib import logger, resolve_host
+from PyQt4 import QtCore, QtGui
+from PyQt4.QtCore import QBuffer, QByteArray, QIODevice
+from dump_grabber.dump_grabber_ui import Ui_MainWindow
 
 try:
     from chaosc.c_osc_lib import OSCMessage, decode_osc
 except ImportError as e:
     from chaosc.osc_lib import OSCMessage, decode_osc
 
-#appName     = "dump_grabber"
-#catalog     = "dump_grabber"
-#programName = ki18n("dump_grabber")
-#version     = "0.1"
-
-#aboutData = KAboutData(appName, catalog, programName, version)
-
-#KCmdLineArgs.init(sys.argv, aboutData)
-
 app = QtGui.QApplication([])
-
-fh = logging.FileHandler(os.path.expanduser("~/.chaosc/dump_grabber.log"))
-fh.setLevel(logging.DEBUG)
-logger.addHandler(fh)
 
 class TextStorage(object):
     def __init__(self, columns):
@@ -112,7 +91,6 @@ class ColumnTextStorage(TextStorage):
         self.columns[column].append(text_item)
         for iy, text_item in enumerate(self.columns[column]):
             text_item.setPos(column * self.column_width, iy * self.line_height)
-
 
 
 class ExclusiveTextStorage(TextStorage):
@@ -280,13 +258,14 @@ class MyHandler(BaseHTTPRequestHandler):
                 last_frame = time.time() - 1.
                 frame_rate = 16.0
                 frame_length = 1. / frame_rate
-                regrex = re.compile("^/(uwe|merle|bjoern)/(.*?)$")
+                regex = re.compile("^/(uwe|merle|bjoern)/(.*?)$")
                 while 1:
                     event_loop.processEvents()
                     app.sendPostedEvents(None, 0)
                     while 1:
                         try:
                             osc_address, args = queue.get_nowait()
+                            print osc_address
                         except Queue.Empty:
                             break
                         else:
@@ -304,39 +283,24 @@ class MyHandler(BaseHTTPRequestHandler):
                     now = time.time()
                     delta = now - last_frame
                     if delta > frame_length:
-                        print 1 / delta
                         last_frame = now
                         img = window.render()
                         buffer = QBuffer()
                         buffer.open(QIODevice.WriteOnly)
                         img.save(buffer, "JPG")
-                        #img.save(os.path.expanduser("~/.chaosc/dump_grabber.jpg"), "JPG")
-
                         JpegData = buffer.data()
                         self.wfile.write("--aaboundary\r\nContent-Type: image/jpeg\r\nContent-length: %d\r\n\r\n%s\r\n\r\n\r\n" % (len(JpegData), JpegData))
-
                         JpegData = None
                         buffer = None
                         img = None
                     time.sleep(0.01)
-
-            elif self.path.endswith(".jpeg"):
-                directory = os.path.dirname(os.path.abspath(__file__))
-                data = open(os.path.join(directory, self.path), "rb").read()
-                self.send_response(200)
-                self.send_header('Content-type','image/jpeg')
-                self.end_headers()
-                self.wfile.write(data)
             return
         except (KeyboardInterrupt, SystemError):
-            #print "queue size", queue.qsize()
             if hasattr(self, "thread") and self.thread is not None:
                 self.thread.running = False
                 self.thread.join()
                 self.thread = None
         except IOError, e:
-            #print "ioerror", e, e[0]
-            #print dir(e)
             if e[0] in (32, 104):
                 if hasattr(self, "thread") and self.thread is not None:
                     self.thread.running = False
@@ -361,11 +325,6 @@ def main():
     arg_parser.add_chaosc_group()
     arg_parser.add_subscriber_group()
     args = arg_parser.finalize()
-
-    if not args.background:
-        ch = logging.StreamHandler()
-        ch.setLevel(logging.DEBUG)
-        logger.addHandler(ch)
 
     http_host, http_port = resolve_host(args.http_host, args.http_port, args.address_family)
 
