@@ -233,7 +233,7 @@
          <set>Qt::LinksAccessibleByKeyboard|Qt::LinksAccessibleByMouse|Qt::TextBrowserInteraction|Qt::TextEditable|Qt::TextEditorInteraction|Qt::TextSelectableByKeyboard|Qt::TextSelectableByMouse</set>
         </property>
         <property name="richTextSupport">
-         <set>KRichTextWidget::SupportAlignment|KRichTextWidget::SupportChangeListStyle|KRichTextWidget::SupportFontFamily|KRichTextWidget::SupportFontSize|KRichTextWidget::SupportIndentLists|KRichTextWidget::SupportTextForegroundColor</set>
+         <set>KRichTextWidget::SupportAlignment|KRichTextWidget::SupportFontFamily|KRichTextWidget::SupportFontSize|KRichTextWidget::SupportTextForegroundColor</set>
         </property>
        </widget>
       </item>

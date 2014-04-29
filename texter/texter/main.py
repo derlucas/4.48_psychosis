@@ -71,6 +71,10 @@ class TextSorterDialog(QtGui.QWidget, Ui_TextSorterDialog):
     def fill_list(self):
         self.model = self.parent().parent().model
         self.text_list.setModel(self.model)
+        ix = self.parent().parent().current_index
+        index = self.model.index(ix, 0)
+        self.text_list.setCurrentIndex(index)
+
 
     def slot_text_up(self):
         row = self.text_list.currentIndex().row()
@@ -81,6 +85,7 @@ class TextSorterDialog(QtGui.QWidget, Ui_TextSorterDialog):
         text_db[row-1], text_db[row] = text_db[row], text_db[row-1]
         self.text_list.setCurrentIndex(self.model.index(row - 1, 0))
         self.text_list.clicked.emit(self.model.index(row - 1, 0))
+        self.parent().parent().db_dirty = True
         return True
 
     def slot_text_down(self):
@@ -93,6 +98,7 @@ class TextSorterDialog(QtGui.QWidget, Ui_TextSorterDialog):
         index = self.model.index(row + 1, 0)
         self.text_list.setCurrentIndex(index)
         self.text_list.clicked.emit(index)
+        self.parent().parent().db_dirty = True
         return True
 
     def slot_show_text(self, model_index):
@@ -108,6 +114,7 @@ class TextSorterDialog(QtGui.QWidget, Ui_TextSorterDialog):
         index = self.model.index(0, 0)
         self.text_list.setCurrentIndex(index)
         self.text_list.clicked.emit(index)
+        self.parent().parent().db_dirty = True
 
 class FadeAnimation(QtCore.QObject):
     animation_started = QtCore.pyqtSignal()
@@ -120,8 +127,8 @@ class FadeAnimation(QtCore.QObject):
         self.fade_steps = fade_steps
         self.current_alpha = 255
         self.timer = None
-    
-    
+
+
     def start_animation(self):
         print "start_animation"
         self.animation_started.emit()
@@ -165,7 +172,6 @@ class FadeAnimation(QtCore.QObject):
                 self.animation_finished.emit()
                 print "animation_finished"
 
-    
 
 class TextAnimation(QtCore.QObject):
     animation_started = QtCore.pyqtSignal()
@@ -245,6 +251,7 @@ class TextAnimation(QtCore.QObject):
                 try:
                     char = self.text.next()
                     self.dst_cursor.insertText(char)
+                    self.dst_text_edit.ensureCursorVisible()
                 except StopIteration:
                     self.fragment_iter += 1
                     self.text = None
@@ -287,11 +294,14 @@ class MainWindow(KMainWindow, Ui_MainWindow):
         self.db_dirty = False
         self.is_animate = False
         self.fade_animation = None
+        self.dialog = None
+        self.current_object = None
+        self.current_index = -1
 
         self.is_auto_publish = False
 
         self.setupUi(self)
-        
+
         self.fade_animation = FadeAnimation(self.live_text, 6, self)
 
         self.font = QtGui.QFont("monospace", self.default_size)
@@ -333,7 +343,7 @@ class MainWindow(KMainWindow, Ui_MainWindow):
         self.preview_size_action.triggered[QtGui.QAction].connect(self.slot_preview_font_size)
         self.live_size_action.triggered[QtGui.QAction].connect(self.slot_live_font_size)
 
-        self.fade_action.triggered.connect(self.slot_fade)
+        #self.fade_action.triggered.connect(self.slot_fade)
         self.next_action.triggered.connect(self.slot_next_item)
         self.previous_action.triggered.connect(self.slot_previous_item)
 
@@ -364,6 +374,7 @@ class MainWindow(KMainWindow, Ui_MainWindow):
             "format_font_family",
             #"format_font_size",
             "format_text_background_color",
+            "format_list_style",
             "format_list_indent_more",
             "format_list_indent_less",
             "format_text_bold",
@@ -371,7 +382,7 @@ class MainWindow(KMainWindow, Ui_MainWindow):
             "format_text_strikeout",
             "format_text_italic",
             "format_align_right",
-            "format_align_justify",
+            #"format_align_justify",
             "manage_link",
             "format_text_subscript",
             "format_text_superscript",
@@ -380,6 +391,7 @@ class MainWindow(KMainWindow, Ui_MainWindow):
 
         for action in self.live_editor_collection.actions():
             text = str(action.objectName())
+            print "text", text
             if text in disabled_action_names:
                 action.setVisible(False)
 
@@ -493,12 +505,12 @@ class MainWindow(KMainWindow, Ui_MainWindow):
 
         spacer = KToolBarSpacerAction(self.action_collection)
         self.action_collection.addAction("1_spacer", spacer)
-        
-        self.fade_action = self.action_collection.addAction("fade_action")
-        #icon = QtGui.QIcon.fromTheme(_fromUtf8("go-previous-view-page"))
-        #self.fade_action.setIcon(icon)
-        self.fade_action.setIconText("fade")
-        self.fade_action.setShortcut(KShortcut(QtGui.QKeySequence(QtCore.Qt.ALT + QtCore.Qt.Key_F)), KAction.ShortcutTypes(KAction.ActiveShortcut | KAction.DefaultShortcut))
+
+        #self.fade_action = self.action_collection.addAction("fade_action")
+        ##icon = QtGui.QIcon.fromTheme(_fromUtf8("go-previous-view-page"))
+        ##self.fade_action.setIcon(icon)
+        #self.fade_action.setIconText("fade")
+        #self.fade_action.setShortcut(KShortcut(QtGui.QKeySequence(QtCore.Qt.ALT + QtCore.Qt.Key_F)), KAction.ShortcutTypes(KAction.ActiveShortcut | KAction.DefaultShortcut))
 
         self.previous_action = self.action_collection.addAction("previous_action")
         icon = QtGui.QIcon.fromTheme(_fromUtf8("go-previous-view-page"))
@@ -637,7 +649,6 @@ class MainWindow(KMainWindow, Ui_MainWindow):
         self.preview_size_action.setFontSize(self.default_size)
         self.preview_text.document().setDefaultFont(self.font)
 
-
     def slot_set_live_defaults(self):
         self.live_center_action.setChecked(True)
         self.live_text.alignCenter()
@@ -645,29 +656,35 @@ class MainWindow(KMainWindow, Ui_MainWindow):
         self.live_size_action.setFontSize(self.default_size)
         self.live_text.document().setDefaultFont(self.font)
 
-
     def slot_clear_live(self):
         self.live_text.clear()
         self.slot_set_live_defaults()
 
-
     def slot_clear_preview(self):
         self.preview_text.clear()
         self.slot_set_preview_defaults()
-    
+
     def slot_fade(self):
         if self.fade_animation.timer is None:
             self.fade_animation.start_animation()
 
-
     def fill_combo_box(self):
+        if self.dialog is not None:
+            self.dialog.deleteLater()
+            self.dialog = None
+
         self.text_combo.clear()
-        for preview, text in self.model.text_db:
+        current_row = -1
+        for ix, list_obj in enumerate(self.model.text_db):
+            preview, text = list_obj
             self.text_combo.addAction(preview)
+            if list_obj == self.current_object:
+                current_row = ix
 
-        self.text_combo.setCurrentItem(0)
-        self.slot_load_preview_text(0)
-
+        if current_row == -1:
+            current_row = self.current_index
+            self.slot_load_preview_text(current_row)
+        self.text_combo.setCurrentItem(current_row)
 
     def slot_load_preview_text(self, index):
         try:
@@ -677,7 +694,6 @@ class MainWindow(KMainWindow, Ui_MainWindow):
         self.preview_text.setTextOrHtml(text)
         if self.is_auto_publish:
             self.slot_publish()
-
 
     def slot_save_live_text(self):
         text = self.live_text.toHtml()
@@ -733,6 +749,12 @@ class MainWindow(KMainWindow, Ui_MainWindow):
 
 
     def slot_open_dialog(self):
+        self.current_index = self.text_combo.currentItem()
+        self.current_object = self.model.text_db[self.current_index]
+        if self.dialog is not None:
+            self.dialog.deleteLater()
+            self.dialog = None
+
         self.dialog = KDialog(self)
         self.dialog_widget = TextSorterDialog(self.dialog)
         self.dialog.setMainWidget(self.dialog_widget)
@@ -745,8 +767,6 @@ class MainWindow(KMainWindow, Ui_MainWindow):
         #self.dialog.setFixedSize(x, global_height-40)
         self.dialog.okClicked.connect(self.fill_combo_box)
         self.dialog.exec_()
-        self.dialog.deleteLater()
-        self.dialog = None
 
     def slot_load(self):
         path = os.path.expanduser("~/.texter")

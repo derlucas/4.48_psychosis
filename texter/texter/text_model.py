@@ -19,6 +19,8 @@ class TextModel(QtCore.QAbstractTableModel):
         return 2
 
     def data(self, index, role):
+        if role not in (1,3,4,5,6,7,8,9,10,13):
+            print "role", role
         if not index.isValid() or \
             not 0 <= index.row() < self.rowCount():
             return QVariant()
@@ -28,6 +30,10 @@ class TextModel(QtCore.QAbstractTableModel):
         if role == QtCore.Qt.DisplayRole:
             return self.text_db[row][column]
             #return "foo bar"
+        elif role == QtCore.Qt.ForegroundRole:
+            return QtGui.QBrush(QtCore.Qt.black)
+        elif role == QtCore.Qt.BackgroundRole:
+            return QtGui.QBrush(QtCore.Qt.white)
 
         return QtCore.QVariant()
 
@@ -43,7 +49,11 @@ class TextModel(QtCore.QAbstractTableModel):
     def setData(self, index, value, role):
 
         if role == QtCore.Qt.EditRole:
-            self.text_db[index.row()][index.column()] = value.toString()
+            text = value.toString()
+            if not text:
+                return False
+            else:
+                self.text_db[index.row()][index.column()] = text
 
         return True
 
