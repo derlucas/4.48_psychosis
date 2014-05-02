@@ -90,13 +90,13 @@
         <property name="minimumSize">
          <size>
           <width>775</width>
-          <height>578</height>
+          <height>582</height>
          </size>
         </property>
         <property name="maximumSize">
          <size>
           <width>775</width>
-          <height>578</height>
+          <height>582</height>
          </size>
         </property>
         <property name="palette">
@@ -248,13 +248,13 @@
         <property name="minimumSize">
          <size>
           <width>300</width>
-          <height>577</height>
+          <height>582</height>
          </size>
         </property>
         <property name="maximumSize">
          <size>
-          <width>769</width>
-          <height>577</height>
+          <width>775</width>
+          <height>582</height>
          </size>
         </property>
         <property name="palette">

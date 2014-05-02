@@ -52,6 +52,69 @@ except ImportError as e:
     from chaosc.osc_lib import OSCMessage, decode_osc
 
 
+class Generator(object):
+    def __init__(self):
+        self.count = 0
+        self.max_count = 200
+        self.min_puls = 75
+        self.max_pulse = 160
+        self.pulse = 83
+
+    def run(self):
+        data_points = 0
+
+        min_puls = 70
+        max_pulse = 130
+        pulse = random.randint(min_puls, max_pulse)
+
+        steps, sleep_time = get_steps(pulse, sleep_time)
+        count = 0
+        delta = 1
+
+        result = list()
+
+        print "pulse", pulse
+        print "sleep_time", sleep_time
+        print "steps", steps
+
+        while 1:
+            value = random.randint(0, steps)
+            if count < int(steps / 100. * 20):
+                value = random.randint(0,20)
+            elif count < int(steps / 100. * 30):
+                value = random.randint(20, 30)
+            elif count < int(steps / 100. * 40):
+                value = random.randint(30,100)
+            elif count < int(steps / 2.):
+                value = random.randint(100,200)
+            elif count == int(steps / 2.):
+                value = 255
+            elif count < int(steps / 100. * 60):
+                value = random.randint(100, 200)
+            elif count < int(steps / 100. * 70):
+                value = random.randint(50, 100)
+            elif count < int(steps / 100. * 80):
+                value = random.randint(20, 50)
+            elif count <= steps:
+                value = random.randint(0,20)
+            elif count >= steps:
+                count = 0
+
+            #if data_points % (5 * steps) == 0:
+                #print "new steps", steps, delta
+                #steps += delta
+
+            #if steps <= min_steps:
+                #delta = 1
+            #elif steps >= max_steps:
+                #print "change step sign", steps, delta
+                #delta = -1
+
+            time.sleep(sleep_time)
+            count += 1
+            #data_points += 1
+            serial_sock.write(struct.pack("B", value))
+
 class OSCThread(threading.Thread):
     def __init__(self, args):
         super(OSCThread, self).__init__()
@@ -266,7 +329,7 @@ class MyHandler(BaseHTTPRequestHandler):
                 self.thread = thread = OSCThread(self.server.args)
                 thread.daemon = True
                 thread.start()
-                actor_names = ["bjoern", "uwe", "merle"]
+                actor_names = ["merle", "uwe", "bjoern" ]
                 num_data = 100
                 colors = ["r", "g", "b"]
                 qtapp = QtGui.QApplication([])
@@ -339,7 +402,6 @@ def main():
     arg_parser.add_subscriber_group()
     args = arg_parser.finalize()
 
- 
     http_host, http_port = resolve_host(args.http_host, args.http_port, args.address_family)
 
     server = JustAHTTPServer((http_host, http_port), MyHandler)

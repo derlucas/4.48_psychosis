@@ -559,7 +559,7 @@ class MainWindow(KMainWindow, Ui_MainWindow):
         public_rect = self.live_text.geometry()
         global_rect = QtCore.QRect(self.mapToGlobal(public_rect.topLeft()), self.mapToGlobal(public_rect.bottomRight()))
         self.ffserver = subprocess.Popen("ffserver -f /etc/ffserver.conf", shell=True, close_fds=True)
-        self.ffmpeg = subprocess.Popen("ffmpeg -f x11grab -s 768x576 -r 30 -i :0.0+%d,%d -vcodec mjpeg -pix_fmt yuvj444p -r 30 -aspect 4:3 http://localhost:8090/webcam.ffm" % (global_rect.x()+5, global_rect.y()+5), shell=True, close_fds=True)
+        self.ffmpeg = subprocess.Popen("ffmpeg -f x11grab -show_region 1 -s 768x576 -r 30 -i :0.0+%d,%d -vcodec mjpeg -pix_fmt yuvj444p -r 30 -aspect 4:3 http://localhost:8090/webcam.ffm" % (global_rect.x()+3, global_rect.y()+3), shell=True, close_fds=True)
         self.is_streaming = True
 
     def focusChanged(self, old, new):
