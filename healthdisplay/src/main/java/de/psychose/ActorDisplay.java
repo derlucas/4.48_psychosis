@@ -9,6 +9,7 @@ import java.awt.event.ActionEvent;
  * @date: 14.04.14 21:44
  */
 public class ActorDisplay {
+    private final Timer timer;
     private final static Color onColor = Color.WHITE;
     private final static Color offColor = Color.RED;
     private final static String offText = "no data";
@@ -73,7 +74,7 @@ public class ActorDisplay {
     }
 
     public ActorDisplay() {
-        final Timer timer = new Timer(100, new AbstractAction() {
+        this.timer = new Timer(100, new AbstractAction() {
             @Override
             public void actionPerformed(ActionEvent e) {
 
@@ -127,8 +128,11 @@ public class ActorDisplay {
                 }
             }
         });
-        timer.setRepeats(true);
-        timer.start();
+        this.timer.setRepeats(true);
+    }
+
+    public void startErrorTimer() {
+        this.timer.start();
     }
 
 }

@@ -23,58 +23,68 @@ import java.util.List;
  */
 public class SnmpStatClient {
     public static final String OID_COUNTER = "1.3.6.1.2.1.2.2.1.10";
-    private final String host;
     private HashMap<Integer, Long> lastPorts = new HashMap<>();
     private HashMap<Integer, Long> sumPorts = new HashMap<>();
+    private Snmp snmp;
+    private CommunityTarget communityTarget;
 
-    private CommunityTarget getCommunityTarget() {
+    private CommunityTarget getCommunityTarget(String host) {
         CommunityTarget communityTarget = new CommunityTarget();
         communityTarget.setCommunity(new OctetString("public"));
         communityTarget.setVersion(SnmpConstants.version2c);
         communityTarget.setAddress(new UdpAddress(host));
-        communityTarget.setTimeout(500);
+        communityTarget.setTimeout(100);
         return communityTarget;
     }
 
     public SnmpStatClient(String host) {
-        this.host = host;
-    }
-
-    public long getTrafficSum() {
-
-        long sum = 0;
-
         try {
             final TransportMapping transportMapping = new DefaultUdpTransportMapping();
             transportMapping.listen();
 
-            final Snmp snmp = new Snmp(transportMapping);
+            this.communityTarget = getCommunityTarget(host);
+            this.snmp = new Snmp(transportMapping);
+
+        } catch (IOException e) {
+            System.out.println("error: cannot get traffic from snmp target");
+        }
+    }
+
+    public long getTrafficSum() {
+
+        if (snmp == null || this.communityTarget == null) {
+            System.out.println("snmp error");
+            return 0;
+        }
+
+        long sum = 0;
+
+        try {
+
             final TreeUtils treeUtils = new TreeUtils(snmp, new DefaultPDUFactory());
-            final List<TreeEvent> treeEventList = treeUtils.getSubtree(getCommunityTarget(), new OID(OID_COUNTER));
+            final List<TreeEvent> treeEventList = treeUtils.getSubtree(this.communityTarget, new OID(OID_COUNTER));
 
             for (TreeEvent treeEvent : treeEventList) {
                 if (treeEvent.getStatus() == TreeEvent.STATUS_OK) {
                     for (VariableBinding binding : treeEvent.getVariableBindings()) {
                         int oid = binding.getOid().last();
-                        long value = binding.getVariable().toLong();
+                        long value = binding.getVariable().toLong() / 1024;     // convert bytes down to kilobytes
                         long lastValue = 0;
-                        if(lastPorts.containsKey(oid)) lastValue = lastPorts.get(oid);
+                        if (lastPorts.containsKey(oid)) lastValue = lastPorts.get(oid);
                         long diff = value - lastValue;
 
-                        if(diff > 0) {
+                        if (diff > 0) {
                             sumPorts.put(oid, lastValue + diff);
                         }
                     }
                 }
             }
-
-            snmp.close();
-        } catch (IOException e) {
-            e.printStackTrace();
+        } catch (IllegalArgumentException e) {
+            System.out.println("error: could not resolve address from snmp target");
         }
 
-        for(long port: sumPorts.values()) {
-            sum+=port;
+        for (long port : sumPorts.values()) {
+            sum += port;
         }
 
         return sum;

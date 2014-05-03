@@ -63,7 +63,7 @@
                 <configuration>
                     <archive>
                         <manifest>
-                            <mainClass>de.psychose.MainForm</mainClass>
+                            <mainClass>de.psychose.Main</mainClass>
                         </manifest>
                     </archive>
                     <descriptorRefs>

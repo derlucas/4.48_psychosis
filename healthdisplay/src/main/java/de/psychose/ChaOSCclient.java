@@ -40,6 +40,22 @@ public class ChaOSCclient {
         return changeChaoscSubscription(true);
     }
 
+    public void sendPulse(String actor, int heartbeat, int pulse, int oxygen) {
+
+        try {
+            OSCMessage subscribeMessage = new OSCMessage("/" + actor + "/heartbeat");
+            subscribeMessage.addArgument(heartbeat);
+            subscribeMessage.addArgument(pulse);
+            subscribeMessage.addArgument(oxygen);
+
+            portOut.send(subscribeMessage);
+        } catch (IOException e) {
+            System.out.println("could not send pulse OSC Message");
+            e.printStackTrace();
+        }
+    }
+
+
     private boolean changeChaoscSubscription(boolean subscribe) {
         try {
             OSCMessage subscribeMessage = new OSCMessage("/" + (subscribe ? "subscribe" : "unsubscribe"));
@@ -50,8 +66,6 @@ public class ChaOSCclient {
 
             portOut.send(subscribeMessage);
             return true;
-        } catch (SocketException e) {
-            e.printStackTrace();
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -70,6 +84,7 @@ public class ChaOSCclient {
                 InetAddress addr = a.nextElement();
 
                 if (addr.isSiteLocalAddress()) {
+                    System.out.println("found address: " + addr.getHostAddress());
                     return addr;
                 }
             }

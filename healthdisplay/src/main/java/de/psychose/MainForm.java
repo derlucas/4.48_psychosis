@@ -5,25 +5,24 @@ import com.illposed.osc.OSCMessage;
 
 import javax.swing.*;
 import java.awt.event.ActionEvent;
-import java.awt.event.WindowAdapter;
-import java.awt.event.WindowEvent;
-import java.net.SocketException;
-import java.net.UnknownHostException;
 import java.util.Date;
+import java.util.Observable;
+import java.util.Observer;
 
 /**
  * @author: lucas
  * @date: 14.04.14 21:43
  */
 public class MainForm {
-    private ChaOSCclient osCclient;
-    private SnmpStatClient snmpStatClient;
-
+    private final ChaOSCclient osCclient;
     private JPanel mainPanel;
     private ActorDisplay actor1;
     private ActorDisplay actor2;
     private ActorDisplay actor3;
     private StatsDisplay statDisplay;
+    private PulseControl pulse1;
+    private PulseControl pulse2;
+    private PulseControl pulse3;
 
     private int totalMessageCount = 0;
     private int messagesTempCounter = 0;
@@ -31,15 +30,17 @@ public class MainForm {
     private long totalTraffic = 0;
     private long lastTraffic = 0;
 
-    public MainForm(final ChaOSCclient chaOSCclient, final SnmpStatClient snmpStatClient) {
+    public JPanel getMainPanel() {
+        return mainPanel;
+    }
+
+    public MainForm(final boolean showErrors, final ChaOSCclient chaOSCclient, final SnmpStatClient snmpStatClient) {
         this.osCclient = chaOSCclient;
-        this.snmpStatClient = snmpStatClient;
 
-        addActor("merle", "Proband 1", actor1);
-        addActor("uwe", "Proband 2", actor2);
-        addActor("bjoern", "Proband 3", actor3);
+        addActor("merle", "Körper 1", actor1, pulse1);
+        addActor("uwe", "Körper 2", actor2, pulse2);
+        addActor("bjoern", "Körper 3", actor3, pulse3);
 
-        osCclient.startReceiver();
 
         final Timer timer = new Timer(1000, new AbstractAction() {
             @Override
@@ -55,18 +56,30 @@ public class MainForm {
         final Timer snmpTimer = new Timer(5000, new AbstractAction() {
             @Override
             public void actionPerformed(ActionEvent e) {
-                totalTraffic = snmpStatClient.getTrafficSum();
-                statDisplay.setTotalTraffic(String.valueOf(totalTraffic / 1024));
-                statDisplay.setBandwidth(String.valueOf((totalTraffic - lastTraffic) / 1024 / 5));
+                totalTraffic = snmpStatClient.getTrafficSum();  // in kB
+                statDisplay.setTotalTraffic(String.valueOf(totalTraffic));
+                statDisplay.setBandwidth(String.valueOf((totalTraffic - lastTraffic) / 5));
                 lastTraffic = totalTraffic;
             }
         });
         snmpTimer.setRepeats(true);
-        snmpTimer.start();
+
+
+        if(showErrors) {
+            actor1.startErrorTimer();
+            actor2.startErrorTimer();
+            actor3.startErrorTimer();
+            snmpTimer.start();
+        } else {
+            pulse1.hide();
+            pulse2.hide();
+            pulse3.hide();
+            statDisplay.hide();
+        }
     }
 
 
-    private void addActor(final String actor, final String label, final ActorDisplay actorDisplay) {
+    private void addActor(final String actor, final String label, final ActorDisplay actorDisplay, final PulseControl pulse) {
         actorDisplay.setCaption(label);
         osCclient.addListener("/" + actor.toLowerCase() + "/heartbeat", new OSCListener() {
             @Override
@@ -119,38 +132,18 @@ public class MainForm {
                 }
             }
         });
-    }
 
-    public static void main(String[] args) {
-
-        final String host = args.length > 0 ? args[0] : "chaosc";
-        final int port = args.length > 1 ? Integer.parseInt(args[1]) : 7110;
-
-        try {
-            final ChaOSCclient chaOSCclient = new ChaOSCclient(host, port);
-            final SnmpStatClient snmp = new SnmpStatClient("switch/161");
-            final MainForm mainForm = new MainForm(chaOSCclient, snmp);
-            final JFrame frame = new JFrame("MainForm");
-            frame.setContentPane(mainForm.mainPanel);
-            frame.setResizable(false);
-            frame.setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE);
-            frame.pack();
-
-            frame.addWindowListener(new WindowAdapter() {
-                @Override
-                public void windowClosing(WindowEvent e) {
-                    chaOSCclient.stopReceiver();
-                    super.windowClosing(e);
+        pulse.addObserver(new Observer() {
+            @Override
+            public void update(Observable o, Object arg) {
+                if(arg instanceof PulseData) {
+                    final PulseData data = (PulseData)arg;
+                    osCclient.sendPulse(actor, data.getHeartbeat(), data.getPulse(), data.getOxygen());
                 }
-            });
-
-            frame.setVisible(true);
-
-            new Streamer(8888, mainForm.mainPanel).run();
-
-        } catch (UnknownHostException | SocketException e) {
-            e.printStackTrace();
-        }
+            }
+        });
     }
+
+
 
 }
