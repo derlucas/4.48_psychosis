@@ -25,6 +25,7 @@ import os.path
 import serial
 import socket
 import time
+import sys
 
 from chaosc.argparser_groups import ArgParser
 
@@ -39,6 +40,7 @@ except ImportError as e:
 class Platform(object):
     def __init__(self, args):
         self.args = args
+        self.remote = (self.args.chaosc_host, self.args.chaosc_port)
         self.serial_sock = None
         self.osc_sock = socket.socket(args.address_family, 2, 17)
         self.osc_sock.connect((self.args.chaosc_host, self.args.chaosc_port))
@@ -78,10 +80,10 @@ def create_args(name):
     arg_parser = ArgParser(name)
     arg_parser.add_global_group()
     main_group = arg_parser.add_argument_group("main")
-    arg_parser.add_argument(main_group, "-D", '--device', required=True,
-        type=str, help='device node under /dev')
-    arg_parser.add_argument(main_group, "-a", '--actor', required=True,
-        type=str, help='actor name')
+    arg_parser.add_argument(main_group, "-D", '--device',
+        help='device node under /dev')
+    arg_parser.add_argument(main_group, "-a", '--actor',
+        help='actor name')
     arg_parser.add_argument(main_group, '-b', '--baudrate', type=int, default=115200, choices=sorted(serial.baudrate_constants.keys()),
         help='selects the baudrate, default=115200, for valid values execute "import serial;print sorted(serial.baudrate_constants.keys())"')
     arg_parser.add_chaosc_group()
@@ -90,8 +92,8 @@ def create_args(name):
     return args
 
 
-def init(name):
-    args = create_args(name)
+def init():
+    args = create_args(os.path.basename(sys.argv[0]))
     platform = Platform(args)
     platform.connect()
     atexit.register(platform.close)

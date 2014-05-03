@@ -20,27 +20,30 @@
 
 from __future__ import absolute_import
 
-import time, select
+import time, select, sys
 
 from sensors2osc.common import *
-
+from chaosc.lib import logger
 
 
 def main():
-    platform = init("ekg2osc")
+    platform = init()
 
     actor = platform.args.actor
 
+    msg_count = 0
+
     while 1:
         try:
-            toread, towrite, toerrors = select.select([platform.serial_sock], [],[], 0.05)
+            toread, towrite, toerrors = select.select([platform.serial_sock], [],[], 0.01)
             if toread:
                 t = platform.serial_sock.read(1)
             else:
                 continue
         except (socket.error, serial.serialutil.SerialException), msg:
             # got disconnected?
-            print "serial socket error!!!", msg
+            logger.exception(msg)
+            logger.info("serial socket error!!! - try to reconnect")
             platform.reconnect()
 
         try:
@@ -48,16 +51,20 @@ def main():
         except TypeError, e:
             continue
 
+        if msg_count >= 20:
+            logger.info("value = %d", t)
+            msg_count = 0
+        else:
+            msg_count += 1
+
         try:
-            print "got value", t
             osc_message = OSCMessage("/%s/ekg" % actor)
             osc_message.appendTypedArg(t, "i")
-            platform.osc_sock.sendall(osc_message.encode_osc())
+            platform.osc_sock.sendto(osc_message.encode_osc(), platform.remote)
         except socket.error, msg:
-            print "cannot connect to chaosc"
+            logger.info("ekg2osc error")
+            logger.exception(msg)
             continue
-
-
 
 
 if __name__ == '__main__':

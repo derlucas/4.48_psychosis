@@ -2,7 +2,7 @@
 
 depend() {
   need net
-  use dns localmount chaosc
+  use dns localmount
   after bootmisc
   provide dump_grabber
 }
@@ -10,7 +10,7 @@ depend() {
 
 start() {
   ebegin "starting dump_grabber"
-  start-stop-daemon --start --pidfile /var/run/dump_grabber.pid --make-pidfile --user stefan --group stefan --background --exec env DISPLAY=:0 /usr/bin/dump_grabber
+  start-stop-daemon --start --pidfile /var/run/dump_grabber.pid --make-pidfile --user sarah --group sarah --background --exec env DISPLAY=:0 /usr/bin/dump_grabber
   eend $?
 }
 

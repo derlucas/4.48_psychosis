@@ -2,7 +2,7 @@
 
 depend() {
   need net
-  use dns localmount chaosc
+  use dns localmount
   after bootmisc
   provide ekgplotter
 }
@@ -10,7 +10,7 @@ depend() {
 
 start() {
   ebegin "starting ekgplotter"
-  start-stop-daemon --start --pidfile /var/run/ekgplotter.pid --make-pidfile --user stefan --group stefan --background --exec env DISPLAY=:0 /usr/bin/ekgplotter
+  start-stop-daemon --start --pidfile /var/run/ekgplotter.pid --make-pidfile --user sarah --group sarah --background --exec env DISPLAY=:0 /usr/bin/ekgplotter
   eend $?
 }
 

@@ -19,63 +19,114 @@
 #
 # Copyright (C) 2014 Stefan Kögl
 
-
 from __future__ import absolute_import
 
-import os
-
-from BaseHTTPServer import BaseHTTPRequestHandler, HTTPServer
-from chaosc.argparser_groups import *
-from chaosc.lib import logger, resolve_host
-from collections import deque
-from datetime import datetime
-from dump_grabber.dump_grabber_ui import Ui_MainWindow
-from os import curdir, sep
-from PyKDE4.kdecore import ki18n, KCmdLineArgs, KAboutData
-from PyKDE4.kdeui import KMainWindow, KApplication
-from PyQt4 import QtCore, QtGui
-from PyQt4.QtCore import QBuffer, QByteArray, QIODevice
-from SocketServer import ThreadingMixIn, ForkingMixIn
-
 import logging
-import numpy as np
-
+import os
 import os.path
 import Queue
-import random
 import re
 import select
 import socket
-import string
 import sys
 import threading
 import time
-import traceback
+
+from datetime import datetime
+from BaseHTTPServer import BaseHTTPRequestHandler, HTTPServer
+from chaosc.argparser_groups import *
+from chaosc.lib import logger, resolve_host
+from PyQt4 import QtCore, QtGui
+from PyQt4.QtCore import QBuffer, QByteArray, QIODevice
+from dump_grabber.dump_grabber_ui import Ui_MainWindow
 
 try:
     from chaosc.c_osc_lib import OSCMessage, decode_osc
 except ImportError as e:
     from chaosc.osc_lib import OSCMessage, decode_osc
 
+app = QtGui.QApplication([])
+
+class TextStorage(object):
+    def __init__(self, columns):
+        super(TextStorage, self).__init__()
+        self.column_count = columns
+        self.colors = (QtCore.Qt.red, QtCore.Qt.green, QtGui.QColor(46, 100, 254))
+
+    def init_columns(self):
+        raise NotImplementedError()
+
+    def add_text(self, column, text):
+        raise NotImplementedError()
 
 
-appName     = "dump_grabber"
-catalog     = "dump_grabber"
-programName = ki18n("dump_grabber")
-version     = "0.1"
+class ColumnTextStorage(TextStorage):
+    def __init__(self, columns, default_font, column_width, line_height, scene):
+        super(ColumnTextStorage, self).__init__(columns)
+        self.columns = list()
+        self.default_font = default_font
+        self.column_width = column_width
+        self.line_height = line_height
+        self.graphics_scene = scene
+        self.num_lines, self.offset = divmod(775, self.line_height)
 
-aboutData = KAboutData(appName, catalog, programName, version)
+    def init_columns(self):
+        for x in range(self.column_count):
+            column = list()
+            color = self.colors[x]
+            for y in range(self.num_lines):
+                text_item = self.graphics_scene.addSimpleText("%d:%d" % (x, y), self.default_font)
+                text_item.setBrush(color)
+                text_item.setPos(x * self.column_width, y * self.line_height)
+                column.append(text_item)
+            self.columns.append(column)
 
-KCmdLineArgs.init (sys.argv, aboutData)
+    def add_text(self, column, text):
+        text_item = self.graphics_scene.addSimpleText(text, self.default_font)
+        color = self.colors[column]
+        text_item.setBrush(color)
 
-app = KApplication()
+        old_item = self.columns[column].pop(0)
+        self.graphics_scene.removeItem(old_item)
+        self.columns[column].append(text_item)
+        for iy, text_item in enumerate(self.columns[column]):
+            text_item.setPos(column * self.column_width, iy * self.line_height)
 
-fh = logging.FileHandler(os.path.expanduser("~/.chaosc/dump_grabber.log"))
-fh.setLevel(logging.DEBUG)
-logger.addHandler(fh)
 
-class MainWindow(KMainWindow, Ui_MainWindow):
-    def __init__(self, parent=None, columns=3):
+class ExclusiveTextStorage(TextStorage):
+    def __init__(self, columns, default_font, column_width, line_height, scene):
+        super(ExclusiveTextStorage, self).__init__(columns)
+        self.column_count = columns
+        self.lines = list()
+        self.default_font = default_font
+        self.column_width = column_width
+        self.line_height = line_height
+        self.graphics_scene = scene
+        self.num_lines, self.offset = divmod(775, self.line_height)
+
+    def init_columns(self):
+        color = self.colors[0]
+        for y in range(self.num_lines):
+            text_item = self.graphics_scene.addSimpleText("", self.default_font)
+            text_item.setBrush(color)
+            text_item.setPos(0, y * self.line_height)
+            self.lines.append(text_item)
+
+    def add_text(self, column, text):
+        text_item = self.graphics_scene.addSimpleText(text, self.default_font)
+        text_item.setX(column * self.column_width)
+        color = self.colors[column]
+        text_item.setBrush(color)
+
+        old_item = self.lines.pop(0)
+        self.graphics_scene.removeItem(old_item)
+        self.lines.append(text_item)
+        for iy, text_item in enumerate(self.lines):
+            text_item.setY(iy * self.line_height)
+
+
+class MainWindow(QtGui.QMainWindow, Ui_MainWindow):
+    def __init__(self, parent=None, columns=3, column_exclusive=False):
         super(MainWindow, self).__init__(parent)
         self.setupUi(self)
         self.graphics_view.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
@@ -88,55 +139,27 @@ class MainWindow(KMainWindow, Ui_MainWindow):
         self.default_font = QtGui.QFont("Monospace", 14)
         self.default_font.setStyleHint(QtGui.QFont.Monospace)
         self.default_font.setBold(True)
-        self.blue_color = QtGui.QColor(47,147,235)
+        self.graphics_scene.setFont(self.default_font)
+
         self.font_metrics = QtGui.QFontMetrics(self.default_font)
         self.line_height = self.font_metrics.height()
-        self.num_lines = 775/self.line_height
-
-        self.graphics_scene.setFont(self.default_font)
-        self.brush = QtGui.QBrush(QtGui.QColor(255, 255, 255))
-        self.brush.setStyle(QtCore.Qt.SolidPattern)
         self.column_width = 775 / columns
 
-        self.column_count = columns
-        self.columns = list()
-        for i in range(columns):
-            column = list()
-            for j in range(self.num_lines):
-                text_item = self.graphics_scene.addSimpleText("", self.default_font)
-                if column == 0:
-                    text_item.setBrush(QtCore.Qt.red)
-                elif column == 1:
-                    text_item.setBrush(QtCore.Qt.green)
-                elif column == 2:
-                    text_item.setBrush(self.blue_color)
-                text_item.setPos(j * self.line_height, i * self.column_width)
-                column.append(text_item)
-            self.columns.append(column)
-        self.graphics_view.show()
+        self.text_storage = ExclusiveTextStorage(columns, self.default_font, self.column_width, self.line_height, self.graphics_scene)
+        #self.text_storage = ColumnTextStorage(columns, self.default_font, self.column_width, self.line_height, self.graphics_scene)
+        self.text_storage.init_columns()
 
     def add_text(self, column, text):
-        text_item = self.graphics_scene.addSimpleText(text, self.default_font)
-        if column == 0:
-            text_item.setBrush(QtCore.Qt.red)
-        elif column == 1:
-            text_item.setBrush(QtCore.Qt.green)
-        elif column == 2:
-            text_item.setBrush(self.blue_color)
-        old_item = self.columns[column].pop(0)
-        self.graphics_scene.removeItem(old_item)
-        self.columns[column].append(text_item)
-        for ix, text_item in enumerate(self.columns[column]):
-            text_item.setPos(column * self.column_width, ix * self.line_height)
-
+        self.text_storage.add_text(column, text)
 
     def render(self):
-        image = QtGui.QImage(768, 576, QtGui.QImage.Format_ARGB32)
+        image = QtGui.QImage(768, 576, QtGui.QImage.Format_ARGB32_Premultiplied)
         image.fill(QtCore.Qt.black)
         painter = QtGui.QPainter(image)
-        #painter.setPen(QtCore.Qt.white)
+        painter.setRenderHints(QtGui.QPainter.RenderHint(QtGui.QPainter.Antialiasing | QtGui.QPainter.TextAntialiasing), True)
         painter.setFont(self.default_font)
         self.graphics_view.render(painter, target=QtCore.QRectF(0,0,768,576),source=QtCore.QRect(0,0,768,576))
+        painter.end()
         return image
 
 
@@ -159,17 +182,6 @@ class OSCThread(threading.Thread):
         self.subscribe_me()
 
     def subscribe_me(self):
-        """Use this procedure for a quick'n dirty subscription to your chaosc instance.
-
-        :param chaosc_address: (chaosc_host, chaosc_port)
-        :type chaosc_address: tuple
-
-        :param receiver_address: (host, port)
-        :type receiver_address: tuple
-
-        :param token: token to get authorized for subscription
-        :type token: str
-        """
         logger.info("%s: subscribing to '%s:%d' with label %r", datetime.now().strftime("%x %X"), self.chaosc_address[0], self.chaosc_address[1], self.args.subscriber_label)
         msg = OSCMessage("/subscribe")
         msg.appendTypedArg(self.client_address[0], "s")
@@ -224,7 +236,6 @@ class MyHandler(BaseHTTPRequestHandler):
             if self.path=="" or self.path==None or self.path[:1]==".":
                 self.send_error(403,'Forbidden')
 
-
             if self.path.endswith(".html"):
                 directory = os.path.dirname(os.path.abspath(__file__))
                 data = open(os.path.join(directory, self.path), "rb").read()
@@ -244,53 +255,52 @@ class MyHandler(BaseHTTPRequestHandler):
                 self.end_headers()
 
                 event_loop = QtCore.QEventLoop()
+                last_frame = time.time() - 1.
+                frame_rate = 16.0
+                frame_length = 1. / frame_rate
+                regex = re.compile("^/(uwe|merle|bjoern)/(.*?)$")
                 while 1:
                     event_loop.processEvents()
                     app.sendPostedEvents(None, 0)
                     while 1:
                         try:
                             osc_address, args = queue.get_nowait()
+                            print osc_address
                         except Queue.Empty:
                             break
                         else:
-                            if "merle" in osc_address:
-                                window.add_text(0, "%s = %s" % (osc_address[7:], ", ".join([str(i) for i in args])))
-                            elif "uwe" in osc_address:
-                                window.add_text(1, "%s = %s" % (osc_address[5:], ", ".join([str(i) for i in args])))
-                            elif "bjoern" in osc_address:
-                                window.add_text(2, "%s = %s" % (osc_address[8:], ", ".join([str(i) for i in args])))
+                            try:
+                                actor, text = regex.match(osc_address).groups()
+                                if actor == "merle":
+                                    window.add_text(0, "%s = %s" % (text, ", ".join([str(i) for i in args])))
+                                if actor == "uwe":
+                                    window.add_text(1, "%s = %s" % (text, ", ".join([str(i) for i in args])))
+                                if actor == "bjoern":
+                                    window.add_text(2, "%s = %s" % (text, ", ".join([str(i) for i in args])))
+                            except AttributeError:
+                                pass
 
-                    img = window.render()
-                    buffer = QBuffer()
-                    buffer.open(QIODevice.WriteOnly)
-                    img.save(buffer, "JPG", 50)
-                    img.save("/tmp/test.jpg", "JPG", 50)
-
-                    JpegData = buffer.data()
-                    self.wfile.write("--aaboundary\r\nContent-Type: image/jpeg\r\nContent-length: %d\r\n\r\n%s\r\n\r\n\r\n" % (len(JpegData), JpegData))
-
-                    JpegData = None
-                    buffer = None
-                    img = None
-                    time.sleep(0.06)
-
-            elif self.path.endswith(".jpeg"):
-                directory = os.path.dirname(os.path.abspath(__file__))
-                data = open(os.path.join(directory, self.path), "rb").read()
-                self.send_response(200)
-                self.send_header('Content-type','image/jpeg')
-                self.end_headers()
-                self.wfile.write(data)
+                    now = time.time()
+                    delta = now - last_frame
+                    if delta > frame_length:
+                        last_frame = now
+                        img = window.render()
+                        buffer = QBuffer()
+                        buffer.open(QIODevice.WriteOnly)
+                        img.save(buffer, "JPG")
+                        JpegData = buffer.data()
+                        self.wfile.write("--aaboundary\r\nContent-Type: image/jpeg\r\nContent-length: %d\r\n\r\n%s\r\n\r\n\r\n" % (len(JpegData), JpegData))
+                        JpegData = None
+                        buffer = None
+                        img = None
+                    time.sleep(0.01)
             return
         except (KeyboardInterrupt, SystemError):
-            #print "queue size", queue.qsize()
             if hasattr(self, "thread") and self.thread is not None:
                 self.thread.running = False
                 self.thread.join()
                 self.thread = None
         except IOError, e:
-            #print "ioerror", e, e[0]
-            #print dir(e)
             if e[0] in (32, 104):
                 if hasattr(self, "thread") and self.thread is not None:
                     self.thread.running = False
@@ -298,11 +308,6 @@ class MyHandler(BaseHTTPRequestHandler):
                     self.thread = None
             else:
                 pass
-                #print '-'*40
-                #print 'Exception happened during processing of request from'
-                #traceback.print_exc() # XXX But this goes to stderr!
-                #print '-'*40
-                #self.send_error(404,'File Not Found: %s' % self.path)
 
 
 class JustAHTTPServer(HTTPServer):

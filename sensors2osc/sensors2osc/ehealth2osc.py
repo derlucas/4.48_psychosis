@@ -21,11 +21,11 @@
 from __future__ import absolute_import
 
 from sensors2osc.common import *
-import time, select
+import time, select, sys
 
 
 def main():
-    platform = init("ehealth2osc")
+    platform = init()
 
     actor = platform.args.actor
 
@@ -42,7 +42,7 @@ def main():
             print "serial socket error!!!", msg
             platform.reconnect()
 
-        print "got data", repr(data)
+        print "data", repr(data)
         try:
             airFlow, emg, temp = data.split(";")
         except ValueError, e:
@@ -58,7 +58,7 @@ def main():
         try:
             osc_message = OSCMessage("/%s/airFlow" % actor)
             osc_message.appendTypedArg(airFlow, "i")
-            platform.osc_sock.sendall(osc_message.encode_osc())
+            platform.osc_sock.sendto(osc_message.encode_osc(), platform.remote)
         except socket.error, msg:
             print "cannot connect to chaosc", msg
             continue
@@ -73,7 +73,7 @@ def main():
         try:
             osc_message = OSCMessage("/%s/emg" % actor)
             osc_message.appendTypedArg(emg, "i")
-            platform.osc_sock.sendall(osc_message.encode_osc())
+            platform.osc_sock.sendto(osc_message.encode_osc(), platform.remote)
         except socket.error, msg:
             print "cannot connect to chaosc", msg
             continue
@@ -88,7 +88,7 @@ def main():
         try:
             osc_message = OSCMessage("/%s/temperatur" % actor)
             osc_message.appendTypedArg(temp, "i")
-            platform.osc_sock.sendall(osc_message.encode_osc())
+            platform.osc_sock.sendto(osc_message.encode_osc(), platform.remote)
         except socket.error, msg:
             print "cannot connect to chaosc", msg
             continue

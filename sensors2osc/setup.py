@@ -31,11 +31,18 @@ setup(
     # predefined extension points, e.g. for plugins
     entry_points = """
     [console_scripts]
-    sensors2osc = sensors2osc.main:main
-    sensorTest = sensors2osc.sensorTest:main
     ekg2osc = sensors2osc.ekg2osc:main
+    ekgmerle = sensors2osc.ekg2osc:main
+    ekguwe = sensors2osc.ekg2osc:main
+    ekgbjoern = sensors2osc.ekg2osc:main
     pulse2osc = sensors2osc.pulse2osc:main
+    pulsemerle = sensors2osc.pulse2osc:main
+    pulseuwe = sensors2osc.pulse2osc:main
+    pulsebjoern = sensors2osc.pulse2osc:main
     ehealth2osc = sensors2osc.ehealth2osc:main
+    ehealthmerle = sensors2osc.ehealth2osc:main
+    ehealthuwe = sensors2osc.ehealth2osc:main
+    ehealthbjoern = sensors2osc.ehealth2osc:main
     """,
     # pypi metadata
     author = "Stefan Kögl",
