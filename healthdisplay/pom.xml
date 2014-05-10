@@ -1,7 +1,7 @@
 <project>
     <modelVersion>4.0.0</modelVersion>
     <name>Maven Default Project</name>
-    <version>1.0</version>
+    <version>1.1</version>
 
     <artifactId>psychose</artifactId>
     <groupId>psy</groupId>
@@ -63,7 +63,7 @@
                 <configuration>
                     <archive>
                         <manifest>
-                            <mainClass>de.psychose.MainForm</mainClass>
+                            <mainClass>de.psychose.Main</mainClass>
                         </manifest>
                     </archive>
                     <descriptorRefs>

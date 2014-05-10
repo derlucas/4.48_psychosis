@@ -30,4 +30,8 @@ public class StatsDisplay {
         lblBandwidth.setText(bandwidth);
     }
 
+    public void hide() {
+        this.statPanel.setVisible(false);
+    }
+
 }
