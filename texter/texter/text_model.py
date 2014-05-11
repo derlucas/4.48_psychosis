@@ -19,8 +19,6 @@ class TextModel(QtCore.QAbstractTableModel):
         return 2
 
     def data(self, index, role):
-        if role not in (1,3,4,5,6,7,8,9,10,13):
-            print "role", role
         if not index.isValid() or \
             not 0 <= index.row() < self.rowCount():
             return QVariant()

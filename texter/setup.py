@@ -18,7 +18,7 @@ setup(
     include_package_data = True,
 
     package_data = {
-        "texter" :  ["*.ui", "*.qrc", "*.png"]},
+        "texter" :  ["*.ui", "*.qrc", "*.png", "*.ico", "*.html"]},
 
     exclude_package_data = {'': ['.gitignore']},
 
@@ -47,7 +47,7 @@ setup(
     """,
 
     # FIXME: add license
-    license = "LGPL",
+    license = "GPL",
 
     # FIXME: add keywords
     keywords = "",

@@ -37,10 +37,10 @@ from PyKDE4.kdeui import (KDialog, KActionCollection, KRichTextWidget,
 from PyQt4.QtNetwork import QTcpServer, QTcpSocket
 
 from chaosc.argparser_groups import ArgParser
-from chaosc.lib import resolve_host
+from chaosc.lib import resolve_host, logger
 
 from texter.texter_ui import Ui_MainWindow, _fromUtf8
-from texter.text_sorter_ui import Ui_TextSorterDialog
+from texter.edit_dialog_ui import Ui_EditDialog
 from texter.text_model import TextModel
 
 app = QtGui.QApplication([])
@@ -73,30 +73,30 @@ class MjpegStreamingServer(QTcpServer):
 
     def handle_request(self):
         sock = self.sender()
+        logger.info("handle_request: %s %d", sock.peerAddress(), sock.peerPort())
         sock_id = id(sock)
-        print "handle_request", sock
         if sock.state() in (QTcpSocket.UnconnectedState, QTcpSocket.ClosingState):
-            print "connection closed"
+            logger.info("connection closed")
             self.sockets.remove(sock)
             sock.deleteLater()
             return
 
         client_data = str(sock.readAll())
-        print "request", repr(client_data)
+        logger.info("request %r", client_data)
         line = client_data.split("\r\n")[0]
-        print "first line", repr(line)
+        logger.info("first line: %r", line)
         try:
             resource, ext, http_version = self.regex.match(line).groups()
-            print "resource, ext, http_version", resource, ext, http_version
+            logger.info("resource=%r, ext=%r, http_version=%r", resource, ext, http_version)
         except AttributeError:
-            print "regex not matched"
+            loggging.info("no matching request - sending 404 not found")
             sock.write("HTTP/1.1 404 Not Found\r\n")
         else:
             if ext == "ico":
                 directory = os.path.dirname(os.path.abspath(__file__))
                 data = open(os.path.join(directory, "favicon.ico"), "rb").read()
                 sock.write(QByteArray('HTTP/1.1 200 Ok\r\nContent-Type: image/x-ico\r\n\r\n%s' % data))
-            if ext == "html":
+            elif ext == "html":
                 directory = os.path.dirname(os.path.abspath(__file__))
                 data = open(os.path.join(directory, "index.html"), "rb").read() % sock_id
                 self.html_map[sock_id] = None
@@ -110,46 +110,50 @@ class MjpegStreamingServer(QTcpServer):
                     html_sock_id = None
 
                 if sock not in self.stream_clients:
-                    print "starting streaming..."
+                    logger.info("starting streaming...")
                     if html_sock_id is not None:
                         self.html_map[html_sock_id] = sock
                     self.stream_clients.append(sock)
                     sock.write(QByteArray('HTTP/1.1 200 Ok\r\nContent-Type: multipart/x-mixed-replace; boundary=--2342\r\n\r\n'))
             else:
-                print "not found/handled"
+                logger.error("request not found/handled - sending 404 not found")
                 sock.write("HTTP/1.1 404 Not Found\r\n")
-                self.sockets.remove(sock)
-                sock.close()
+
 
     def remove_stream_client(self):
-        sock = self.sender()
+        try:
+            sock = self.sender()
+        except RuntimeError:
+            return
         sock_id = id(sock)
-        print "remove_stream_client", sock, sock_id
+        logger.info("remove_stream_client: sock=%r, sock_id=%r", sock, sock_id)
         if sock.state() == QTcpSocket.UnconnectedState:
+            sock.disconnected.disconnect(self.remove_stream_client)
             self.sockets.remove(sock)
-            print "removed sock", sock
+            logger.info("removed sock_id=%r", sock_id)
             sock.close()
             try:
                 self.stream_clients.remove(sock)
-            except ValueError, error:
-                print "sock was not in stream_clients", error
+            except ValueError:
+                pass
 
             try:
                 stream_client = self.html_map.pop(sock_id)
-            except KeyError, error:
-                print "socket has no child socket"
+            except KeyError:
+                logger.info("socket has no child socket")
             else:
-                print "html socket has linked stream socket to remove", stream_client, id(stream_client)
                 stream_client.close()
                 try:
                     self.stream_clients.remove(stream_client)
-                except ValueError, error:
-                    print "error", error
+                    logger.info("removed stream_client=%r", id(stream_client))
+                except ValueError:
+                    pass
 
                 try:
                     self.sockets.remove(stream_client)
-                except ValueError, error:
-                    print "error", error
+                    logger.info("removed child sock_id=%r", id(stream_client))
+                except ValueError:
+                    pass
 
     def render_image(self):
         if not self.stream_clients:
@@ -168,6 +172,7 @@ class MjpegStreamingServer(QTcpServer):
     def start_streaming(self):
         while self.hasPendingConnections():
             sock = self.nextPendingConnection()
+            logger.info("new connection=%r", id(sock))
             sock.readyRead.connect(self.handle_request)
             sock.disconnected.connect(self.remove_stream_client)
             self.sockets.append(sock)
@@ -185,11 +190,12 @@ class MjpegStreamingServer(QTcpServer):
         self.close()
 
 
-class TextSorterDialog(QtGui.QWidget, Ui_TextSorterDialog):
+class EditDialog(QtGui.QWidget, Ui_EditDialog):
     def __init__(self, parent=None):
-        super(TextSorterDialog, self).__init__(parent)
+        super(EditDialog, self).__init__(parent)
 
         self.setupUi(self)
+        self.model = None
         self.fill_list()
 
         self.text_list.clicked.connect(self.slot_show_text)
@@ -199,7 +205,7 @@ class TextSorterDialog(QtGui.QWidget, Ui_TextSorterDialog):
         self.text_list.clicked.connect(self.slot_toggle_buttons)
         self.move_up_button.setEnabled(False)
         self.move_down_button.setEnabled(False)
-        self.model = None
+
 
     def slot_toggle_buttons(self, index):
         row = index.row()
@@ -259,61 +265,6 @@ class TextSorterDialog(QtGui.QWidget, Ui_TextSorterDialog):
         self.text_list.setCurrentIndex(index)
         self.text_list.clicked.emit(index)
         self.parent().parent().db_dirty = True
-
-class FadeAnimation(QtCore.QObject):
-    animation_started = QtCore.pyqtSignal()
-    animation_finished = QtCore.pyqtSignal()
-    animation_stopped = QtCore.pyqtSignal()
-
-    def __init__(self, live_text, fade_steps=6, parent=None):
-        super(FadeAnimation, self).__init__(parent)
-        self.live_text = live_text
-        self.fade_steps = fade_steps
-        self.current_alpha = 255
-        self.timer = None
-
-    def start_animation(self):
-        print "start_animation"
-        self.animation_started.emit()
-
-        if self.current_alpha == 255:
-            self.fade_delta = 255 / self.fade_steps
-        else:
-            self.fade_delta = -255 / self.fade_steps
-        self.timer = QtCore.QTimer(self)
-        self.timer.timeout.connect(self.slot_animate)
-        self.timer.start(100)
-
-    def slot_animate(self):
-        print "slot_animate"
-        print "current_alpha", self.current_alpha
-        if self.fade_delta > 0:
-            if self.current_alpha > 0:
-                self.live_text.setStyleSheet("color:%d, %d, %d;" % (self.current_alpha, self.current_alpha, self.current_alpha))
-                self.current_alpha -= self.fade_delta
-            else:
-                self.live_text.setStyleSheet("color:black;")
-                self.current_alpha = 0
-                self.timer.stop()
-                self.timer.timeout.disconnect(self.slot_animate)
-                self.timer.deleteLater()
-                self.timer = None
-                self.animation_finished.emit()
-                print "animation_finished"
-        else:
-            if self.current_alpha < 255:
-                self.live_text.setStyleSheet("color:%d,%d, %d;" % (self.current_alpha, self.current_alpha, self.current_alpha))
-                self.current_alpha -= self.fade_delta
-            else:
-                self.live_text.setStyleSheet("color:white")
-                self.current_alpha = 255
-                self.timer.stop()
-                self.timer.timeout.disconnect(self.slot_animate)
-                self.timer.deleteLater()
-                self.timer = None
-                self.animation_finished.emit()
-                print "animation_finished"
-
 
 class TextAnimation(QtCore.QObject):
     animation_started = QtCore.pyqtSignal()
@@ -442,8 +393,6 @@ class MainWindow(KMainWindow, Ui_MainWindow):
 
         self.setupUi(self)
 
-        self.fade_animation = FadeAnimation(self.live_text, 6, self)
-
         self.font = QtGui.QFont("monospace", self.default_size)
         self.font.setStyleHint(QtGui.QFont.TypeWriter)
 
@@ -464,14 +413,12 @@ class MainWindow(KMainWindow, Ui_MainWindow):
         self.typer_animation_action = None
         self.text_editor_action = None
 
-        #self.preview_text.document().setDefaultFont(self.font)
         self.preview_text.setFont(self.font)
         self.preview_text.setRichTextSupport(KRichTextWidget.RichTextSupport(0xffffffff))
         self.preview_editor_collection = KActionCollection(self)
         self.preview_text.createActions(self.preview_editor_collection)
 
         self.live_text.setRichTextSupport(KRichTextWidget.RichTextSupport(0xffffffff))
-        #self.live_text.document().setDefaultFont(self.font)
         self.live_text.setFont(self.font)
         self.live_editor_collection = KActionCollection(self)
         self.live_text.createActions(self.live_editor_collection)
@@ -479,34 +426,18 @@ class MainWindow(KMainWindow, Ui_MainWindow):
         self.create_toolbar()
         self.slot_load()
 
-
         app.focusChanged.connect(self.focusChanged)
         self.start_streaming()
-        self.get_live_coords()
 
         self.show()
 
-    def get_live_coords(self):
-        public_rect = self.live_text.geometry()
-        global_rect = QtCore.QRect(self.mapToGlobal(public_rect.topLeft()), self.mapToGlobal(public_rect.bottomRight()))
-        x = global_rect.x()
-        y = global_rect.y()
-        self.statusBar().showMessage("live text editor dimensions: x=%r, y=%r, width=%r, height=%r" % (x, y, global_rect.width(), global_rect.height()))
-
-    def get_preview_coords(self):
-        public_rect = self.preview_text.geometry()
-        global_rect = QtCore.QRect(self.mapToGlobal(public_rect.topLeft()), self.mapToGlobal(public_rect.bottomRight()))
-        return global_rect.x(), global_rect.y()
-
     def filter_editor_actions(self):
-
         disabled_action_names = [
             "action_to_plain_text",
             "format_painter",
             "direction_ltr",
             "direction_rtl",
             "format_font_family",
-            #"format_font_size",
             "format_text_background_color",
             "format_list_style",
             "format_list_indent_more",
@@ -516,7 +447,6 @@ class MainWindow(KMainWindow, Ui_MainWindow):
             "format_text_strikeout",
             "format_text_italic",
             "format_align_right",
-            #"format_align_justify",
             "manage_link",
             "format_text_subscript",
             "format_text_superscript",
@@ -525,7 +455,6 @@ class MainWindow(KMainWindow, Ui_MainWindow):
 
         for action in self.live_editor_collection.actions():
             text = str(action.objectName())
-            #print "text", text
             if text in disabled_action_names:
                 action.setVisible(False)
 
@@ -554,6 +483,7 @@ class MainWindow(KMainWindow, Ui_MainWindow):
     def create_toolbar(self):
 
         self.toolbar = KToolBar(self, True, True)
+        self.toolbar.setIconDimensions(16)
         self.toolbar.setAllowedAreas(QtCore.Qt.BottomToolBarArea)
         self.toolbar.setMovable(False)
         self.toolbar.setFloatable(False)
@@ -565,32 +495,31 @@ class MainWindow(KMainWindow, Ui_MainWindow):
         self.action_collection.addAssociatedWidget(self.toolbar)
 
         self.clear_live_action = self.action_collection.addAction("clear_live_action")
-        icon = QtGui.QIcon.fromTheme(_fromUtf8("edit-clear"))
+        icon = QtGui.QIcon(":texter/images/edit-clear.png")
         self.clear_live_action.setIcon(icon)
         self.clear_live_action.setIconText("clear live")
         self.clear_live_action.setShortcut(KShortcut(QtGui.QKeySequence(QtCore.Qt.ALT + QtCore.Qt.Key_Q)), KAction.ShortcutTypes(KAction.ActiveShortcut | KAction.DefaultShortcut))
 
         self.save_live_action = self.action_collection.addAction("save_live_action")
-        icon = QtGui.QIcon.fromTheme(_fromUtf8("document-new"))
+        icon = QtGui.QIcon(":texter/images/document-new.png")
         self.save_live_action.setIcon(icon)
         self.save_live_action.setIconText("save live")
         self.save_live_action.setShortcut(KShortcut(QtGui.QKeySequence(QtCore.Qt.ALT + QtCore.Qt.Key_W)), KAction.ShortcutTypes(KAction.ActiveShortcut | KAction.DefaultShortcut))
 
         self.clear_preview_action = self.action_collection.addAction("clear_preview_action")
-        icon = QtGui.QIcon.fromTheme(_fromUtf8("edit-clear"))
+        icon = QtGui.QIcon(":texter/images/edit-clear.png")
         self.clear_preview_action.setIcon(icon)
         self.clear_preview_action.setIconText("clear preview")
-        #self.clear_preview_action.setObjectName("clear_preview")
         self.clear_preview_action.setShortcut(KShortcut(QtGui.QKeySequence(QtCore.Qt.ALT + QtCore.Qt.Key_A)), KAction.ShortcutTypes(KAction.ActiveShortcut | KAction.DefaultShortcut))
 
         self.save_preview_action = self.action_collection.addAction("save_preview_action")
-        icon = QtGui.QIcon.fromTheme(_fromUtf8("document-new"))
+        icon = QtGui.QIcon(":texter/images/document-new.png")
         self.save_preview_action.setIcon(icon)
         self.save_preview_action.setIconText("save preview")
         self.save_preview_action.setShortcut(KShortcut(QtGui.QKeySequence(QtCore.Qt.ALT + QtCore.Qt.Key_S)), KAction.ShortcutTypes(KAction.ActiveShortcut | KAction.DefaultShortcut))
 
         self.publish_action = self.action_collection.addAction("publish_action")
-        icon = QtGui.QIcon.fromTheme(_fromUtf8("edit-copy"))
+        icon = QtGui.QIcon(":texter/images/edit-copy.png")
         self.publish_action.setIcon(icon)
         self.publish_action.setIconText("publish")
         self.publish_action.setShortcutConfigurable(True)
@@ -600,14 +529,14 @@ class MainWindow(KMainWindow, Ui_MainWindow):
 
         self.auto_publish_action = KToggleAction(self.action_collection)
         self.action_collection.addAction("auto publish", self.auto_publish_action)
-        icon = QtGui.QIcon.fromTheme(_fromUtf8("view-refresh"))
+        icon = QtGui.QIcon(":texter/images/view-refresh.png")
         self.auto_publish_action.setIcon(icon)
         self.auto_publish_action.setObjectName("auto_publish_action")
         self.auto_publish_action.setIconText("auto publish")
         self.auto_publish_action.setShortcut(KShortcut(QtGui.QKeySequence(QtCore.Qt.ALT + QtCore.Qt.Key_P)), KAction.ShortcutTypes(KAction.ActiveShortcut | KAction.DefaultShortcut))
 
         self.typer_animation_action = KToggleAction(self.action_collection)
-        icon = QtGui.QIcon.fromTheme(_fromUtf8("media-playback-stop"))
+        icon = QtGui.QIcon(":texter/images/media-playback-stop.png")
         self.typer_animation_action.setIcon(icon)
         self.typer_animation_action.setIconText("animate")
         self.typer_animation_action.setObjectName("typer_animation_action")
@@ -615,7 +544,7 @@ class MainWindow(KMainWindow, Ui_MainWindow):
         self.action_collection.addAction("typer_animation_action", self.typer_animation_action)
 
         self.text_editor_action = self.action_collection.addAction("text_editor_action")
-        icon = QtGui.QIcon.fromTheme(_fromUtf8("document-open-data"))
+        icon = QtGui.QIcon(":texter/images/document-open-data.png")
         self.text_editor_action.setIcon(icon)
         self.text_editor_action.setIconText("edit")
         self.text_editor_action.setShortcut(KShortcut(QtGui.QKeySequence(QtCore.Qt.CTRL + QtCore.Qt.Key_O)), KAction.ShortcutTypes(KAction.ActiveShortcut | KAction.DefaultShortcut))
@@ -623,13 +552,13 @@ class MainWindow(KMainWindow, Ui_MainWindow):
         self.toolbar.insertSeparator(self.text_editor_action)
 
         self.save_action = self.action_collection.addAction("save_action")
-        icon = QtGui.QIcon.fromTheme(_fromUtf8("document-save"))
+        icon = QtGui.QIcon(":texter/images/document-save.png")
         self.save_action.setIcon(icon)
         self.save_action.setIconText("save")
         self.save_action.setShortcut(KShortcut(QtGui.QKeySequence(QtCore.Qt.CTRL + QtCore.Qt.Key_S)), KAction.ShortcutTypes(KAction.ActiveShortcut | KAction.DefaultShortcut))
 
         self.streaming_action = KToggleAction(self.action_collection)
-        icon = QtGui.QIcon.fromTheme(_fromUtf8("media-record"))
+        icon = QtGui.QIcon(":texter/images/media-record.png")
         self.streaming_action.setIcon(icon)
         self.streaming_action.setIconText("stream")
         self.streaming_action.setObjectName("stream")
@@ -639,28 +568,22 @@ class MainWindow(KMainWindow, Ui_MainWindow):
         spacer = KToolBarSpacerAction(self.action_collection)
         self.action_collection.addAction("1_spacer", spacer)
 
-        #self.fade_action = self.action_collection.addAction("fade_action")
-        ##icon = QtGui.QIcon.fromTheme(_fromUtf8("go-previous-view-page"))
-        ##self.fade_action.setIcon(icon)
-        #self.fade_action.setIconText("fade")
-        #self.fade_action.setShortcut(KShortcut(QtGui.QKeySequence(QtCore.Qt.ALT + QtCore.Qt.Key_F)), KAction.ShortcutTypes(KAction.ActiveShortcut | KAction.DefaultShortcut))
-
         self.previous_action = self.action_collection.addAction("previous_action")
-        icon = QtGui.QIcon.fromTheme(_fromUtf8("go-previous-view-page"))
+        icon = QtGui.QIcon(":texter/images/go-previous-view-page.png")
         self.previous_action.setIcon(icon)
         self.previous_action.setIconText("previous")
         self.previous_action.setShortcut(KShortcut(QtGui.QKeySequence(QtCore.Qt.ALT + QtCore.Qt.Key_Left)), KAction.ShortcutTypes(KAction.ActiveShortcut | KAction.DefaultShortcut))
 
         self.text_combo = KSelectAction(self.action_collection)
         self.text_combo.setEditable(False)
-        icon = QtGui.QIcon.fromTheme(_fromUtf8("document-open-recent"))
+        icon = QtGui.QIcon(":texter/images/document-open-recent.png")
         self.text_combo.setIcon(icon)
         self.text_combo.setIconText("saved texts")
         self.text_combo.setObjectName("text_combo")
         self.action_collection.addAction("saved texts", self.text_combo)
 
         self.next_action = self.action_collection.addAction("next_action")
-        icon = QtGui.QIcon.fromTheme(_fromUtf8("go-next-view-page"))
+        icon = QtGui.QIcon(":texter/images/go-next-view-page.png")
         self.next_action.setIcon(icon)
         self.next_action.setIconText("next")
         self.next_action.setShortcut(KShortcut(QtGui.QKeySequence(QtCore.Qt.ALT + QtCore.Qt.Key_Right)), KAction.ShortcutTypes(KAction.ActiveShortcut | KAction.DefaultShortcut))
@@ -682,7 +605,6 @@ class MainWindow(KMainWindow, Ui_MainWindow):
         self.preview_size_action.triggered[QtGui.QAction].connect(self.slot_preview_font_size)
         self.live_size_action.triggered[QtGui.QAction].connect(self.slot_live_font_size)
 
-        #self.fade_action.triggered.connect(self.slot_fade)
         self.next_action.triggered.connect(self.slot_next_item)
         self.previous_action.triggered.connect(self.slot_previous_item)
         self.streaming_action.setChecked(True)
@@ -889,12 +811,11 @@ class MainWindow(KMainWindow, Ui_MainWindow):
             self.dialog = None
 
         self.dialog = KDialog(self)
-        self.dialog_widget = TextSorterDialog(self.dialog)
+        self.dialog.setButtons(KDialog.Close)
+        self.dialog_widget = EditDialog(self.dialog)
         self.dialog.setMainWidget(self.dialog_widget)
-        pos_x, pos_y = self.get_preview_coords()
-        self.dialog.move(pos_x, 0)
-        self.dialog.okClicked.connect(self.fill_combo_box)
         self.dialog.exec_()
+        self.fill_combo_box()
 
     def slot_load(self):
         path = os.path.expanduser("~/.texter")
@@ -908,7 +829,7 @@ class MainWindow(KMainWindow, Ui_MainWindow):
         try:
             self.model.text_db = [list(i) for  i in cPickle.load(db_file)]
         except ValueError, error:
-            print error
+            logger.exception(error)
 
         self.fill_combo_box()
         self.text_combo.setCurrentItem(0)
@@ -916,7 +837,7 @@ class MainWindow(KMainWindow, Ui_MainWindow):
 
 
 def main():
-    arg_parser = ArgParser("dump_grabber")
+    arg_parser = ArgParser("texter")
     arg_parser.add_global_group()
     client_group = arg_parser.add_client_group()
     arg_parser.add_argument(client_group, '-x', "--http_host", default="::",

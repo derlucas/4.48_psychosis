@@ -1,5 +1,16 @@
 <RCC>
   <qresource prefix="texter">
+    <file>images/document-new.png</file>
+    <file>images/document-open-data.png</file>
+    <file>images/document-open-recent.png</file>
+    <file>images/document-save.png</file>
+    <file>images/edit-clear.png</file>
+    <file>images/edit-copy.png</file>
+    <file>images/go-next-view-page.png</file>
+    <file>images/go-previous-view-page.png</file>
+    <file>images/media-playback-stop.png</file>
+    <file>images/media-record.png</file>
+    <file>images/view-refresh.png</file>
     <file>icon.png</file>
   </qresource>
 </RCC>
