@@ -41,7 +41,7 @@ class RingBuffer(object):
         self.head = (self.head + 1) % self.length
 
     def getData(self):
-        print "getData", self.ring_buf, self.head
+        #print "getData", self.ring_buf, self.head
         data = list()
         for i in range(self.length + 1, 1, -1):
             value = self.ring_buf[(self.head - i) % self.length]
@@ -52,7 +52,7 @@ class RingBuffer(object):
                 raise ValueError("not complete - reset ringbuffer")
             data.append(value)
         if data[0] != 0x0 or data[1] != 0xff:
-            print "issue", data
+            #print "issue", data
             self.reset()
             self.ring_buf[0] = 0
             self.head = 1
@@ -77,7 +77,7 @@ def main():
                 continue
         except (socket.error, serial.serialutil.SerialException), msg:
             # got disconnected?
-            print "serial socket error!!!", msg
+            logger.exception(msg)
             platform.reconnect()
 
         try:
@@ -91,8 +91,8 @@ def main():
         if t == 0:
             try:
                 heart_signal, heart_rate, o2, pulse = buf.getData()
-            except ValueError, e:
-                print e
+            except ValueError, msg:
+                logger.exception(msg)
                 continue
 
             if pulse == 245 and not heartbeat_on:
@@ -103,12 +103,12 @@ def main():
                     osc_message.appendTypedArg(heart_rate, "i")
                     osc_message.appendTypedArg(o2, "i")
                     platform.osc_sock.sendto(osc_message.encode_osc(), platform.remote)
-                    print "on heartbeat", datetime.now(), heart_signal, heart_rate, o2, pulse
+                    #print "on heartbeat", datetime.now(), heart_signal, heart_rate, o2, pulse
                 except socket.error, msg:
-                    print "cannot connect to chaosc"
+                    logger.exception(msg)
                     continue
             elif pulse == 1 and heartbeat_on:
-                print "off heartbeat", datetime.now(), heart_signal, heart_rate, o2, pulse
+                #print "off heartbeat", datetime.now(), heart_signal, heart_rate, o2, pulse
                 heartbeat_on = False
                 try:
                     osc_message = OSCMessage("/%s/heartbeat" % actor)
@@ -117,7 +117,7 @@ def main():
                     osc_message.appendTypedArg(o2, "i")
                     platform.osc_sock.sendto(osc_message.encode_osc(), platform.remote)
                 except socket.error, msg:
-                    print "cannot connect to chaosc"
+                    logger.exception(msg)
                     continue
 
 

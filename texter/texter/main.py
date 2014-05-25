@@ -60,7 +60,8 @@ class MjpegStreamingServer(QTcpServer):
         super(MjpegStreamingServer, self).__init__(parent)
         self.server_address = server_address
         self.newConnection.connect(self.start_streaming)
-        self.widget = parent
+        self.widget = parent.live_text
+        self.win_id = self.widget.winId()
         self.sockets = list()
         self.img_data = None
         self.timer = QtCore.QTimer()
@@ -72,6 +73,7 @@ class MjpegStreamingServer(QTcpServer):
         self.coords = parent.live_text_rect()
 
     def handle_request(self):
+        print "foo"
         sock = self.sender()
         logger.info("handle_request: %s %d", sock.peerAddress(), sock.peerPort())
         sock_id = id(sock)
@@ -89,7 +91,7 @@ class MjpegStreamingServer(QTcpServer):
             resource, ext, http_version = self.regex.match(line).groups()
             logger.info("resource=%r, ext=%r, http_version=%r", resource, ext, http_version)
         except AttributeError:
-            loggging.info("no matching request - sending 404 not found")
+            logger.info("no matching request - sending 404 not found")
             sock.write("HTTP/1.1 404 Not Found\r\n")
         else:
             if ext == "ico":
@@ -159,10 +161,11 @@ class MjpegStreamingServer(QTcpServer):
         if not self.stream_clients:
             return
 
-        pixmap = QPixmap.grabWidget(self.widget.live_text, *self.coords)
+        #pixmap = QPixmap.grabWidget(self.widget, QtCore.QRect(10, 10, 768, 576))
+        pixmap = QPixmap.grabWindow(self.win_id, 5, 5, 768, 576)
         buf = QBuffer()
         buf.open(QIODevice.WriteOnly)
-        pixmap.save(buf, "JPG", 25)
+        pixmap.save(buf, "JPG", 30)
         self.img_data = buf.data()
         len_data = len(self.img_data)
         array = QByteArray("--2342\r\nContent-Type: image/jpeg\r\nContent-length: %d\r\n\r\n%s\r\n\r\n\r\n" % (len_data, self.img_data))
@@ -368,7 +371,7 @@ class MainWindow(KMainWindow, Ui_MainWindow):
         super(MainWindow, self).__init__(parent)
         self.args = args
         self.is_streaming = False
-        self.http_server = MjpegStreamingServer((args.http_host, args.http_port), self)
+
         self.live_center_action = None
         self.preview_center_action = None
         self.live_size_action = None
@@ -392,6 +395,10 @@ class MainWindow(KMainWindow, Ui_MainWindow):
         self.is_auto_publish = False
 
         self.setupUi(self)
+        self.http_server = MjpegStreamingServer((args.http_host, args.http_port), self)
+
+        self.live_text.setLineWrapMode(QtGui.QTextEdit.LineWrapMode(QtGui.QTextEdit.FixedPixelWidth))
+        self.live_text.setLineWrapColumnOrWidth(768)
 
         self.font = QtGui.QFont("monospace", self.default_size)
         self.font.setStyleHint(QtGui.QFont.TypeWriter)
@@ -430,6 +437,12 @@ class MainWindow(KMainWindow, Ui_MainWindow):
         self.start_streaming()
 
         self.show()
+
+    def getPreviewCoords(self):
+        public_rect = self.preview_text.geometry()
+        global_rect = QtCore.QRect(self.mapToGlobal(public_rect.topLeft()), self.mapToGlobal(public_rect.bottomRight()))
+        return global_rect.x(), global_rect.y()
+
 
     def filter_editor_actions(self):
         disabled_action_names = [
@@ -620,14 +633,14 @@ class MainWindow(KMainWindow, Ui_MainWindow):
             self.dialog.exec_()
 
     def live_text_rect(self):
-        return 3, 3, 768, 576
+        return 5, 5, 768, 576
 
     def stop_streaming(self):
         self.is_streaming = False
         self.http_server.stop()
 
     def start_streaming(self):
-        self.http_server.listen(port=9009)
+        self.http_server.listen(port=self.args.http_port)
         self.is_streaming = True
 
     def focusChanged(self, old, new):
@@ -814,6 +827,8 @@ class MainWindow(KMainWindow, Ui_MainWindow):
         self.dialog.setButtons(KDialog.Close)
         self.dialog_widget = EditDialog(self.dialog)
         self.dialog.setMainWidget(self.dialog_widget)
+        pos_x, pos_y = self.getPreviewCoords()
+        self.dialog.move(pos_x, self.pos().y())
         self.dialog.exec_()
         self.fill_combo_box()
 

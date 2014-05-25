@@ -30,7 +30,7 @@ setup(
     # predefined extension points, e.g. for plugins
     entry_points = """
     [console_scripts]
-    ekgplotter = ekgplotter.main:main
+    ekgplotter = ekgplotter.main_qt:main
     """,
     # pypi metadata
     author = "Stefan Kögl",

@@ -1,7 +1,6 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 
-
 # This file is part of chaosc and psychosis
 #
 # chaosc is free software: you can redistribute it and/or modify
@@ -21,24 +20,20 @@
 
 from __future__ import absolute_import
 
-import logging
 import os
 import os.path
-import Queue
 import re
-import select
-import socket
 import sys
-import threading
-import time
 
 from datetime import datetime
-from BaseHTTPServer import BaseHTTPRequestHandler, HTTPServer
 from chaosc.argparser_groups import *
 from chaosc.lib import logger, resolve_host
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import QBuffer, QByteArray, QIODevice
+from PyQt4.QtNetwork import QTcpServer, QTcpSocket, QUdpSocket, QHostAddress
+
 from dump_grabber.dump_grabber_ui import Ui_MainWindow
+from psylib.mjpeg_streaming_server import MjpegStreamingServer
 
 try:
     from chaosc.c_osc_lib import OSCMessage, decode_osc
@@ -68,7 +63,7 @@ class ColumnTextStorage(TextStorage):
         self.column_width = column_width
         self.line_height = line_height
         self.graphics_scene = scene
-        self.num_lines, self.offset = divmod(775, self.line_height)
+        self.num_lines, self.offset = divmod(768, self.line_height)
 
     def init_columns(self):
         for x in range(self.column_count):
@@ -102,7 +97,7 @@ class ExclusiveTextStorage(TextStorage):
         self.column_width = column_width
         self.line_height = line_height
         self.graphics_scene = scene
-        self.num_lines, self.offset = divmod(775, self.line_height)
+        self.num_lines, self.offset = divmod(576, self.line_height)
 
     def init_columns(self):
         color = self.colors[0]
@@ -125,10 +120,17 @@ class ExclusiveTextStorage(TextStorage):
             text_item.setY(iy * self.line_height)
 
 
+
+
+
 class MainWindow(QtGui.QMainWindow, Ui_MainWindow):
-    def __init__(self, parent=None, columns=3, column_exclusive=False):
+    def __init__(self, args, parent=None, columns=3, column_exclusive=False):
         super(MainWindow, self).__init__(parent)
+        self.args = args
+
         self.setupUi(self)
+        self.http_server = MjpegStreamingServer((args.http_host, args.http_port), self)
+        self.http_server.listen(port=args.http_port)
         self.graphics_view.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
         self.graphics_view.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
         self.graphics_view.setRenderHint(QtGui.QPainter.Antialiasing, True)
@@ -140,178 +142,78 @@ class MainWindow(QtGui.QMainWindow, Ui_MainWindow):
         self.default_font.setStyleHint(QtGui.QFont.Monospace)
         self.default_font.setBold(True)
         self.graphics_scene.setFont(self.default_font)
-
         self.font_metrics = QtGui.QFontMetrics(self.default_font)
         self.line_height = self.font_metrics.height()
         self.column_width = 775 / columns
 
         self.text_storage = ExclusiveTextStorage(columns, self.default_font, self.column_width, self.line_height, self.graphics_scene)
-        #self.text_storage = ColumnTextStorage(columns, self.default_font, self.column_width, self.line_height, self.graphics_scene)
         self.text_storage.init_columns()
+
+        self.osc_sock = QUdpSocket(self)
+        logger.info("osc bind localhost %d", args.client_port)
+        self.osc_sock.bind(QHostAddress("127.0.0.1"), args.client_port)
+        self.osc_sock.readyRead.connect(self.got_message)
+        self.osc_sock.error.connect(self.handle_osc_error)
+        msg = OSCMessage("/subscribe")
+        msg.appendTypedArg("localhost", "s")
+        msg.appendTypedArg(args.client_port, "i")
+        msg.appendTypedArg(self.args.authenticate, "s")
+        if self.args.subscriber_label is not None:
+            msg.appendTypedArg(self.args.subscriber_label, "s")
+        self.osc_sock.writeDatagram(QByteArray(msg.encode_osc()), QHostAddress("127.0.0.1"), 7110)
+        #self.add_text(0, "foo bar")
+
+        self.regex = re.compile("^/(uwe|merle|bjoern)/(.*?)$")
+
+    def closeEvent(self, event):
+        msg = OSCMessage("/unsubscribe")
+        msg.appendTypedArg("localhost", "s")
+        msg.appendTypedArg(self.args.client_port, "i")
+        msg.appendTypedArg(self.args.authenticate, "s")
+        self.osc_sock.writeDatagram(QByteArray(msg.encode_osc()), QHostAddress("127.0.0.1"), 7110)
+
+    def handle_osc_error(self, error):
+        logger.info("osc socket error %d", error)
 
     def add_text(self, column, text):
         self.text_storage.add_text(column, text)
 
-    def render(self):
+    def render_image(self):
         image = QtGui.QImage(768, 576, QtGui.QImage.Format_ARGB32_Premultiplied)
         image.fill(QtCore.Qt.black)
         painter = QtGui.QPainter(image)
-        painter.setRenderHints(QtGui.QPainter.RenderHint(QtGui.QPainter.Antialiasing | QtGui.QPainter.TextAntialiasing), True)
+        painter.setRenderHints(QtGui.QPainter.RenderHint(
+            QtGui.QPainter.Antialiasing | QtGui.QPainter.TextAntialiasing),
+            True)
         painter.setFont(self.default_font)
-        self.graphics_view.render(painter, target=QtCore.QRectF(0,0,768,576),source=QtCore.QRect(0,0,768,576))
+        self.graphics_view.render(painter, target=QtCore.QRectF(0, 0, 768, 576),
+            source=QtCore.QRect(0, 0, 768, 576))
         painter.end()
-        return image
+        buf = QBuffer()
+        buf.open(QIODevice.WriteOnly)
+        image.save(buf, "JPG", 80)
+        image_data = buf.data()
+        return image_data
 
-
-class OSCThread(threading.Thread):
-    def __init__(self, args):
-        super(OSCThread, self).__init__()
-        self.args = args
-        self.running = True
-
-        self.client_address = resolve_host(args.client_host, args.client_port, args.address_family)
-
-        self.chaosc_address = chaosc_host, chaosc_port = resolve_host(args.chaosc_host, args.chaosc_port, args.address_family)
-
-        self.osc_sock = socket.socket(args.address_family, 2, 17)
-        self.osc_sock.bind(self.client_address)
-        self.osc_sock.setblocking(0)
-
-        logger.info("starting up osc receiver on '%s:%d'", self.client_address[0], self.client_address[1])
-
-        self.subscribe_me()
-
-    def subscribe_me(self):
-        logger.info("%s: subscribing to '%s:%d' with label %r", datetime.now().strftime("%x %X"), self.chaosc_address[0], self.chaosc_address[1], self.args.subscriber_label)
-        msg = OSCMessage("/subscribe")
-        msg.appendTypedArg(self.client_address[0], "s")
-        msg.appendTypedArg(self.client_address[1], "i")
-        msg.appendTypedArg(self.args.authenticate, "s")
-        if self.args.subscriber_label is not None:
-            msg.appendTypedArg(self.args.subscriber_label, "s")
-        self.osc_sock.sendto(msg.encode_osc(), self.chaosc_address)
-
-
-    def unsubscribe_me(self):
-        if self.args.keep_subscribed:
-            return
-
-        logger.info("unsubscribing from '%s:%d'", self.chaosc_address[0], self.chaosc_address[1])
-        msg = OSCMessage("/unsubscribe")
-        msg.appendTypedArg(self.client_address[0], "s")
-        msg.appendTypedArg(self.client_address[1], "i")
-        msg.appendTypedArg(self.args.authenticate, "s")
-        self.osc_sock.sendto(msg.encode_osc(), self.chaosc_address)
-
-    def run(self):
-
-        while self.running:
+    def got_message(self):
+        while self.osc_sock.hasPendingDatagrams():
+            data, address, port = self.osc_sock.readDatagram(self.osc_sock.pendingDatagramSize())
             try:
-                reads, writes, errs = select.select([self.osc_sock], [], [], 0.01)
-            except Exception, e:
+                osc_address, typetags, args = decode_osc(data, 0, len(data))
+            except Exception:
+                return
+            try:
+                actor, text = self.regex.match(osc_address).groups()
+            except AttributeError:
                 pass
             else:
-                if reads:
-                    try:
-                        osc_input, address = self.osc_sock.recvfrom(8192)
-                        osc_address, typetags, messages = decode_osc(osc_input, 0, len(osc_input))
-                        queue.put_nowait((osc_address, messages))
-                    except Exception, e:
-                        pass
-                else:
-                    pass
-
-        self.unsubscribe_me()
-        logger.info("OSCThread is going down")
-
-
-queue = Queue.Queue()
-
-class MyHandler(BaseHTTPRequestHandler):
-
-    def do_GET(self):
-
-        try:
-            self.path=re.sub('[^.a-zA-Z0-9]', "",str(self.path))
-            if self.path=="" or self.path==None or self.path[:1]==".":
-                self.send_error(403,'Forbidden')
-
-            if self.path.endswith(".html"):
-                directory = os.path.dirname(os.path.abspath(__file__))
-                data = open(os.path.join(directory, self.path), "rb").read()
-                self.send_response(200)
-                self.send_header('Content-type', 'text/html')
-                self.end_headers()
-                self.wfile.write(data)
-            elif self.path.endswith(".mjpeg"):
-                self.thread = thread = OSCThread(self.server.args)
-                thread.daemon = True
-                thread.start()
-                window = MainWindow()
-                window.hide()
-
-                self.send_response(200)
-                self.send_header("Content-Type", "multipart/x-mixed-replace; boundary=--aaboundary")
-                self.end_headers()
-
-                event_loop = QtCore.QEventLoop()
-                last_frame = time.time() - 1.
-                frame_rate = 16.0
-                frame_length = 1. / frame_rate
-                regex = re.compile("^/(uwe|merle|bjoern)/(.*?)$")
-                while 1:
-                    event_loop.processEvents()
-                    app.sendPostedEvents(None, 0)
-                    while 1:
-                        try:
-                            osc_address, args = queue.get_nowait()
-                            print osc_address
-                        except Queue.Empty:
-                            break
-                        else:
-                            try:
-                                actor, text = regex.match(osc_address).groups()
-                                if actor == "merle":
-                                    window.add_text(0, "%s = %s" % (text, ", ".join([str(i) for i in args])))
-                                if actor == "uwe":
-                                    window.add_text(1, "%s = %s" % (text, ", ".join([str(i) for i in args])))
-                                if actor == "bjoern":
-                                    window.add_text(2, "%s = %s" % (text, ", ".join([str(i) for i in args])))
-                            except AttributeError:
-                                pass
-
-                    now = time.time()
-                    delta = now - last_frame
-                    if delta > frame_length:
-                        last_frame = now
-                        img = window.render()
-                        buffer = QBuffer()
-                        buffer.open(QIODevice.WriteOnly)
-                        img.save(buffer, "JPG")
-                        JpegData = buffer.data()
-                        self.wfile.write("--aaboundary\r\nContent-Type: image/jpeg\r\nContent-length: %d\r\n\r\n%s\r\n\r\n\r\n" % (len(JpegData), JpegData))
-                        JpegData = None
-                        buffer = None
-                        img = None
-                    time.sleep(0.01)
-            return
-        except (KeyboardInterrupt, SystemError):
-            if hasattr(self, "thread") and self.thread is not None:
-                self.thread.running = False
-                self.thread.join()
-                self.thread = None
-        except IOError, e:
-            if e[0] in (32, 104):
-                if hasattr(self, "thread") and self.thread is not None:
-                    self.thread.running = False
-                    self.thread.join()
-                    self.thread = None
-            else:
-                pass
-
-
-class JustAHTTPServer(HTTPServer):
-    pass
+                if actor == "merle":
+                    self.add_text(0, "%s = %s" % (text, ", ".join([str(i) for i in args])))
+                elif actor == "uwe":
+                    self.add_text(1, "%s = %s" % (text, ", ".join([str(i) for i in args])))
+                elif actor == "bjoern":
+                    self.add_text(2, "%s = %s" % (text, ", ".join([str(i) for i in args])))
+        return True
 
 
 def main():
@@ -327,13 +229,10 @@ def main():
     args = arg_parser.finalize()
 
     http_host, http_port = resolve_host(args.http_host, args.http_port, args.address_family)
+    window = MainWindow(args)
+    #window.show()
+    app.exec_()
 
-    server = JustAHTTPServer((http_host, http_port), MyHandler)
-    server.address_family = args.address_family
-    server.args = args
-    logger.info("starting up http server on '%s:%d'", http_host, http_port)
-
-    server.serve_forever()
 
 if ( __name__ == '__main__' ):
     main()

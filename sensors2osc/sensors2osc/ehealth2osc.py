@@ -39,20 +39,19 @@ def main():
             #print repr(data)
         except (socket.error, serial.serialutil.SerialException), msg:
             # got disconnected?
-            print "serial socket error!!!", msg
+            logger.exception(msg)
             platform.reconnect()
 
-        print "data", repr(data)
         try:
             airFlow, emg, temp = data.split(";")
-        except ValueError, e:
-            print e
+        except ValueError, msg:
+            logger.exception(msg)
             continue
 
         try:
             airFlow = int(airFlow)
-        except ValueError, e:
-            print e
+        except ValueError, msg:
+            logger.exception(msg)
             continue
 
         try:
@@ -60,14 +59,14 @@ def main():
             osc_message.appendTypedArg(airFlow, "i")
             platform.osc_sock.sendto(osc_message.encode_osc(), platform.remote)
         except socket.error, msg:
-            print "cannot connect to chaosc", msg
+            logger.exception(msg)
             continue
 
 
         try:
             emg = int(emg)
-        except ValueError, e:
-            print e
+        except ValueError, msg:
+            logger.exception(msg)
             continue
 
         try:
@@ -75,14 +74,14 @@ def main():
             osc_message.appendTypedArg(emg, "i")
             platform.osc_sock.sendto(osc_message.encode_osc(), platform.remote)
         except socket.error, msg:
-            print "cannot connect to chaosc", msg
+            logger.exception(msg)
             continue
 
 
         try:
             temp = int(temp)
-        except ValueError, e:
-            print e
+        except ValueError, msg:
+            logger.exception(msg)
             continue
 
         try:
@@ -90,7 +89,7 @@ def main():
             osc_message.appendTypedArg(temp, "i")
             platform.osc_sock.sendto(osc_message.encode_osc(), platform.remote)
         except socket.error, msg:
-            print "cannot connect to chaosc", msg
+            logger.exception(msg)
             continue
 
 

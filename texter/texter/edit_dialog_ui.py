@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 
-# Form implementation generated from reading ui file 'texter4.ui'
+# Form implementation generated from reading ui file 'edit_dialog.ui'
 #
-# Created: Mon Apr 28 21:58:51 2014
+# Created: Sat May 17 16:15:38 2014
 #      by: PyQt4 UI code generator 4.10.3
 #
 # WARNING! All changes made in this file will be lost!
@@ -23,32 +23,23 @@ except AttributeError:
     def _translate(context, text, disambig):
         return QtGui.QApplication.translate(context, text, disambig)
 
-class Ui_TextSorterDialog(object):
-    def setupUi(self, TextSorterDialog):
-        TextSorterDialog.setObjectName(_fromUtf8("TextSorterDialog"))
-        TextSorterDialog.resize(1084, 633)
-        self.verticalLayout = QtGui.QVBoxLayout(TextSorterDialog)
+class Ui_EditDialog(object):
+    def setupUi(self, EditDialog):
+        EditDialog.setObjectName(_fromUtf8("EditDialog"))
+        EditDialog.resize(1084, 633)
+        self.verticalLayout = QtGui.QVBoxLayout(EditDialog)
         self.verticalLayout.setObjectName(_fromUtf8("verticalLayout"))
-        self.splitter = QtGui.QSplitter(TextSorterDialog)
-        self.splitter.setOrientation(QtCore.Qt.Horizontal)
-        self.splitter.setObjectName(_fromUtf8("splitter"))
-        self.text_list = QtGui.QListView(self.splitter)
-        sizePolicy = QtGui.QSizePolicy(QtGui.QSizePolicy.Expanding, QtGui.QSizePolicy.Expanding)
-        sizePolicy.setHorizontalStretch(1)
-        sizePolicy.setVerticalStretch(0)
-        sizePolicy.setHeightForWidth(self.text_list.sizePolicy().hasHeightForWidth())
-        self.text_list.setSizePolicy(sizePolicy)
-        self.text_list.setMinimumSize(QtCore.QSize(200, 576))
-        self.text_list.setMaximumSize(QtCore.QSize(16777215, 576))
+        self.horizontalLayout_2 = QtGui.QHBoxLayout()
+        self.horizontalLayout_2.setObjectName(_fromUtf8("horizontalLayout_2"))
+        self.text_list = QtGui.QTableView(EditDialog)
         self.text_list.setObjectName(_fromUtf8("text_list"))
-        self.text_preview = KRichTextWidget(self.splitter)
+        self.horizontalLayout_2.addWidget(self.text_list)
+        self.text_preview = QtGui.QTextEdit(EditDialog)
         sizePolicy = QtGui.QSizePolicy(QtGui.QSizePolicy.Expanding, QtGui.QSizePolicy.Expanding)
         sizePolicy.setHorizontalStretch(100)
         sizePolicy.setVerticalStretch(0)
         sizePolicy.setHeightForWidth(self.text_preview.sizePolicy().hasHeightForWidth())
         self.text_preview.setSizePolicy(sizePolicy)
-        self.text_preview.setMinimumSize(QtCore.QSize(0, 576))
-        self.text_preview.setMaximumSize(QtCore.QSize(768, 576))
         palette = QtGui.QPalette()
         brush = QtGui.QBrush(QtGui.QColor(255, 255, 255))
         brush.setStyle(QtCore.Qt.SolidPattern)
@@ -186,10 +177,13 @@ class Ui_TextSorterDialog(object):
         brush.setStyle(QtCore.Qt.SolidPattern)
         palette.setBrush(QtGui.QPalette.Disabled, QtGui.QPalette.ToolTipText, brush)
         self.text_preview.setPalette(palette)
+        self.text_preview.setUndoRedoEnabled(False)
         self.text_preview.setReadOnly(True)
+        self.text_preview.setTextInteractionFlags(QtCore.Qt.NoTextInteraction)
         self.text_preview.setObjectName(_fromUtf8("text_preview"))
-        self.verticalLayout.addWidget(self.splitter)
-        self.kbuttongroup = KButtonGroup(TextSorterDialog)
+        self.horizontalLayout_2.addWidget(self.text_preview)
+        self.verticalLayout.addLayout(self.horizontalLayout_2)
+        self.kbuttongroup = KButtonGroup(EditDialog)
         self.kbuttongroup.setObjectName(_fromUtf8("kbuttongroup"))
         self.horizontalLayout = QtGui.QHBoxLayout(self.kbuttongroup)
         self.horizontalLayout.setObjectName(_fromUtf8("horizontalLayout"))
@@ -206,14 +200,12 @@ class Ui_TextSorterDialog(object):
         self.remove_button.setObjectName(_fromUtf8("remove_button"))
         self.horizontalLayout.addWidget(self.remove_button)
         self.verticalLayout.addWidget(self.kbuttongroup)
-        spacerItem = QtGui.QSpacerItem(20, 40, QtGui.QSizePolicy.Minimum, QtGui.QSizePolicy.Expanding)
-        self.verticalLayout.addItem(spacerItem)
 
-        self.retranslateUi(TextSorterDialog)
-        QtCore.QMetaObject.connectSlotsByName(TextSorterDialog)
+        self.retranslateUi(EditDialog)
+        QtCore.QMetaObject.connectSlotsByName(EditDialog)
 
-    def retranslateUi(self, TextSorterDialog):
-        TextSorterDialog.setWindowTitle(_translate("TextSorterDialog", "Form", None))
-        self.remove_button.setText(_translate("TextSorterDialog", "Remove", None))
+    def retranslateUi(self, EditDialog):
+        EditDialog.setWindowTitle(_translate("EditDialog", "Form", None))
+        self.remove_button.setText(_translate("EditDialog", "Remove", None))
 
-from PyKDE4.kdeui import KButtonGroup, KArrowButton, KPushButton, KRichTextWidget
+from PyKDE4.kdeui import KButtonGroup, KArrowButton, KPushButton

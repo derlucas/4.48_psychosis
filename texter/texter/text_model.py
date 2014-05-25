@@ -16,7 +16,7 @@ class TextModel(QtCore.QAbstractTableModel):
         return len(self.text_db)
 
     def columnCount(self, parent=QtCore.QModelIndex()):
-        return 2
+        return 1
 
     def data(self, index, role):
         if not index.isValid() or \
@@ -26,12 +26,9 @@ class TextModel(QtCore.QAbstractTableModel):
         row = index.row()
         column = index.column()
         if role == QtCore.Qt.DisplayRole:
-            return self.text_db[row][column]
+            print "data", row, column, row
+            return QtCore.QVariant(self.text_db[row][column])
             #return "foo bar"
-        elif role == QtCore.Qt.ForegroundRole:
-            return QtGui.QBrush(QtCore.Qt.black)
-        elif role == QtCore.Qt.BackgroundRole:
-            return QtGui.QBrush(QtCore.Qt.white)
 
         return QtCore.QVariant()
 
@@ -45,6 +42,12 @@ class TextModel(QtCore.QAbstractTableModel):
         return QtCore.QVariant()
 
     def setData(self, index, value, role):
+        if (not index.isValid() or
+            not 0 <= index.row() < self.rowCount()):
+            print "setData index not valid"
+            return False
+
+        print "setData", index.row(), index.column(), value, role
 
         if role == QtCore.Qt.EditRole:
             text = value.toString()
@@ -52,14 +55,16 @@ class TextModel(QtCore.QAbstractTableModel):
                 return False
             else:
                 self.text_db[index.row()][index.column()] = text
-
-        return True
+                return True
+        else:
+            return False
 
     def flags(self, index):
-        return QtCore.Qt.ItemIsSelectable |  QtCore.Qt.ItemIsEditable | QtCore.Qt.ItemIsEnabled | QtCore.Qt.ItemIsDragEnabled | QtCore.Qt.ItemIsDropEnabled
+        if index.column() == 0:
+            return QtCore.Qt.ItemIsSelectable |  QtCore.Qt.ItemIsEditable | QtCore.Qt.ItemIsEnabled
+        else:
+            return QtCore.Qt.ItemIsSelectable |  QtCore.Qt.ItemIsEnabled
 
-    def supportedDropActions(self):
-        return QtCore.Qt.MoveAction
 
     def insertRows(self, row, count, parent=QtCore.QModelIndex()):
         self.beginInsertRows(parent, row, row+count+1)

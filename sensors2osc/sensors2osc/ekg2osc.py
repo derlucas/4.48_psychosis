@@ -51,11 +51,11 @@ def main():
         except TypeError, e:
             continue
 
-        if msg_count >= 20:
-            logger.info("value = %d", t)
-            msg_count = 0
-        else:
-            msg_count += 1
+        #if msg_count >= 20:
+        #    logger.info("value = %d", t)
+        #    msg_count = 0
+        #else:
+        #    msg_count += 1
 
         try:
             osc_message = OSCMessage("/%s/ekg" % actor)
