@@ -1,20 +1,20 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 
-# This file is part of chaosc and psychosis
+# This file is part of chaosc/psylib package
 #
-# chaosc/psychosis is free software: you can redistribute it and/or modify
+# chaosc/psylib is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation, either version 3 of the License, or
 # (at your option) any later version.
 #
-# chaosc/psychosis is distributed in the hope that it will be useful,
+# chaosc/psylib is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
 #
 # You should have received a copy of the GNU General Public License
-# along with chaosc/psychosis.  If not, see <http://www.gnu.org/licenses/>.
+# along with chaosc/psylib.  If not, see <http://www.gnu.org/licenses/>.
 #
 # Copyright (C) 2014 Stefan Kögl
 
@@ -23,27 +23,47 @@ from __future__ import absolute_import
 import os
 import os.path
 import re
-import sys
 
-from datetime import datetime
-from chaosc.argparser_groups import *
-from chaosc.lib import logger, resolve_host
-from PyQt4 import QtCore, QtGui
-from PyQt4.QtCore import QBuffer, QByteArray, QIODevice
+from chaosc.lib import logger
+from PyQt4 import QtCore
+from PyQt4.QtCore import QByteArray
 from PyQt4.QtNetwork import QTcpServer, QTcpSocket
+
+__all__ = ["MjpegStreamingConsumerInterface", "MjpegStreamingServer"]
+
+class MjpegStreamingConsumerInterface(object):
+    def pubdir(self):
+        """ returns the directory, from where your static files should be served
+
+        fast and dirty implementation e.g:
+        return os.path.dirname(os.path.abspath(__file__))
+        """
+
+        raise NotImplementedError()
+
+    def render_image(self):
+        """returns a QByteArray with the binary date of a jpg image
+
+        this method should implement the actual window/widget grabbing"""
+
+        raise NotImplementedError()
 
 class MjpegStreamingServer(QTcpServer):
 
-    def __init__(self, server_address, parent=None):
+    def __init__(self, server_address, parent=None, fps=12.5):
         super(MjpegStreamingServer, self).__init__(parent)
         self.server_address = server_address
         self.newConnection.connect(self.new_connection)
+        assert isinstance(parent, MjpegStreamingConsumerInterface)
         self.widget = parent
+
         self.sockets = list()
         self.img_data = None
+        self.fps = fps
+        self.timer_delta = 1000 / fps
         self.timer = QtCore.QTimer()
         self.timer.timeout.connect(self.send_image)
-        self.timer.start(80)
+        self.timer.start(self.timer_delta)
         self.stream_clients = list()
         self.get_regex = re.compile("^GET /(\w+?)\.(\w+?) HTTP/(\d+\.\d+)$")
         self.host_regex = re.compile("^Host: (\w+?):(\d+)$")
@@ -51,8 +71,8 @@ class MjpegStreamingServer(QTcpServer):
 
     def handle_request(self):
         sock = self.sender()
-        logger.info("handle_request: %s %d", sock.peerAddress(), sock.peerPort())
         sock_id = id(sock)
+        logger.info("handle_request: sock_id=%r", sock_id)
         if sock.state() in (QTcpSocket.UnconnectedState, QTcpSocket.ClosingState):
             logger.info("connection closed")
             self.sockets.remove(sock)
@@ -79,14 +99,26 @@ class MjpegStreamingServer(QTcpServer):
                 return
         else:
             if ext == "ico":
-                directory = os.path.dirname(os.path.abspath(__file__))
-                data = open(os.path.join(directory, "favicon.ico"), "rb").read()
-                sock.write(QByteArray('HTTP/1.1 200 Ok\r\nContent-Type: image/x-ico\r\n\r\n%s' % data))
+                directory = self.widget.pubdir()
+                try:
+                    data = open(os.path.join(directory, "favicon.ico"), "rb").read()
+                except IOError:
+                    logger.error("request not found/handled - sending 404 not found")
+                    sock.write("HTTP/1.1 404 Not Found\r\n")
+                    return
+                else:
+                    sock.write(QByteArray('HTTP/1.1 200 Ok\r\nContent-Type: image/x-ico\r\n\r\n%s' % data))
             elif ext == "html":
-                directory = os.path.dirname(os.path.abspath(__file__))
-                data = open(os.path.join(directory, "index.html"), "rb").read() % sock_id
-                self.html_map[sock_id] = None
-                sock.write(QByteArray('HTTP/1.1 200 Ok\r\nContent-Type: text/html;encoding: utf-8\r\n\r\n%s' % data))
+                directory = self.widget.pubdir()
+                try:
+                    data = open(os.path.join(directory, "index.html"), "rb").read() % sock_id
+                    self.html_map[sock_id] = None
+                except IOError:
+                    logger.error("request not found/handled - sending 404 not found")
+                    sock.write("HTTP/1.1 404 Not Found\r\n")
+                    return
+                else:
+                    sock.write(QByteArray('HTTP/1.1 200 Ok\r\nContent-Type: text/html;encoding: utf-8\r\n\r\n%s' % data))
             elif ext == "mjpeg":
                 try:
                     _, html_sock_id = resource.split("_", 1)
@@ -117,31 +149,40 @@ class MjpegStreamingServer(QTcpServer):
         sock.disconnected.disconnect(self.slot_remove_connection)
         sock.close()
         sock.deleteLater()
-        self.sockets.remove(sock)
-        logger.info("connection removed: sock=%r, sock_id=%r", sock, sock_id)
+        try:
+            self.sockets.remove(sock)
+            logger.info("connection %r removed", sock_id)
+        except ValueError, msg:
+            logger.info("connection %r was not stored?", sock_id)
+
 
         try:
             self.stream_clients.remove(sock)
         except ValueError:
-            pass
+            logger.info("connection %r was not streaming", sock_id)
+
 
         try:
             stream_client = self.html_map.pop(sock_id)
         except KeyError:
-            logger.info("socket has no child socket")
+            logger.info("socket %r has no child socket", sock_id)
         else:
-            stream_client.close()
             try:
-                self.stream_clients.remove(stream_client)
-                logger.info("removed stream_client=%r", id(stream_client))
-            except ValueError:
-                pass
+                stream_client.close()
+            except AttributeError, msg:
+                logger.info("no stream client")
+            else:
+                try:
+                    self.stream_clients.remove(stream_client)
+                    logger.info("child connection %r removed from streaming", id(stream_client))
+                except ValueError:
+                    pass
 
-            try:
-                self.sockets.remove(stream_client)
-                logger.info("removed child sock_id=%r", id(stream_client))
-            except ValueError:
-                pass
+                try:
+                    self.sockets.remove(stream_client)
+                    logger.info("child connection %r removed from storage", id(stream_client))
+                except ValueError:
+                    pass
 
 
     def send_image(self):

@@ -24,6 +24,7 @@ from __future__ import absolute_import
 import cPickle
 import os.path
 import re
+import sys
 
 from PyQt4 import QtCore, QtGui
 
@@ -39,11 +40,14 @@ from PyQt4.QtNetwork import QTcpServer, QTcpSocket
 from chaosc.argparser_groups import ArgParser
 from chaosc.lib import resolve_host, logger
 
+from psylib.mjpeg_streaming_server import *
+from psylib.psyqt_base import PsyQtClientBase
+
 from texter.texter_ui import Ui_MainWindow, _fromUtf8
 from texter.edit_dialog_ui import Ui_EditDialog
 from texter.text_model import TextModel
 
-app = QtGui.QApplication([])
+qtapp = QtGui.QApplication([])
 
 
 # NOTE: if the QIcon.fromTheme method does not find any icons, you can use
@@ -53,144 +57,6 @@ app = QtGui.QApplication([])
 
 def get_preview_text(text):
     return re.sub(" +", " ", text.replace("\n", " ")).strip()[:20]
-
-class MjpegStreamingServer(QTcpServer):
-
-    def __init__(self, server_address, parent=None):
-        super(MjpegStreamingServer, self).__init__(parent)
-        self.server_address = server_address
-        self.newConnection.connect(self.start_streaming)
-        self.widget = parent.live_text
-        self.win_id = self.widget.winId()
-        self.sockets = list()
-        self.img_data = None
-        self.timer = QtCore.QTimer()
-        self.timer.timeout.connect(self.render_image)
-        self.timer.start(80)
-        self.stream_clients = list()
-        self.regex = re.compile("^GET /(\w+?)\.(\w+?) HTTP/(\d+\.\d+)$")
-        self.html_map = dict()
-        self.coords = parent.live_text_rect()
-
-    def handle_request(self):
-        print "foo"
-        sock = self.sender()
-        logger.info("handle_request: %s %d", sock.peerAddress(), sock.peerPort())
-        sock_id = id(sock)
-        if sock.state() in (QTcpSocket.UnconnectedState, QTcpSocket.ClosingState):
-            logger.info("connection closed")
-            self.sockets.remove(sock)
-            sock.deleteLater()
-            return
-
-        client_data = str(sock.readAll())
-        logger.info("request %r", client_data)
-        line = client_data.split("\r\n")[0]
-        logger.info("first line: %r", line)
-        try:
-            resource, ext, http_version = self.regex.match(line).groups()
-            logger.info("resource=%r, ext=%r, http_version=%r", resource, ext, http_version)
-        except AttributeError:
-            logger.info("no matching request - sending 404 not found")
-            sock.write("HTTP/1.1 404 Not Found\r\n")
-        else:
-            if ext == "ico":
-                directory = os.path.dirname(os.path.abspath(__file__))
-                data = open(os.path.join(directory, "favicon.ico"), "rb").read()
-                sock.write(QByteArray('HTTP/1.1 200 Ok\r\nContent-Type: image/x-ico\r\n\r\n%s' % data))
-            elif ext == "html":
-                directory = os.path.dirname(os.path.abspath(__file__))
-                data = open(os.path.join(directory, "index.html"), "rb").read() % sock_id
-                self.html_map[sock_id] = None
-                sock.write(QByteArray('HTTP/1.1 200 Ok\r\nContent-Type: text/html;encoding: utf-8\r\n\r\n%s' % data))
-                #sock.close()
-            elif ext == "mjpeg":
-                try:
-                    _, html_sock_id = resource.split("_", 1)
-                    html_sock_id = int(html_sock_id)
-                except ValueError:
-                    html_sock_id = None
-
-                if sock not in self.stream_clients:
-                    logger.info("starting streaming...")
-                    if html_sock_id is not None:
-                        self.html_map[html_sock_id] = sock
-                    self.stream_clients.append(sock)
-                    sock.write(QByteArray('HTTP/1.1 200 Ok\r\nContent-Type: multipart/x-mixed-replace; boundary=--2342\r\n\r\n'))
-            else:
-                logger.error("request not found/handled - sending 404 not found")
-                sock.write("HTTP/1.1 404 Not Found\r\n")
-
-
-    def remove_stream_client(self):
-        try:
-            sock = self.sender()
-        except RuntimeError:
-            return
-        sock_id = id(sock)
-        logger.info("remove_stream_client: sock=%r, sock_id=%r", sock, sock_id)
-        if sock.state() == QTcpSocket.UnconnectedState:
-            sock.disconnected.disconnect(self.remove_stream_client)
-            self.sockets.remove(sock)
-            logger.info("removed sock_id=%r", sock_id)
-            sock.close()
-            try:
-                self.stream_clients.remove(sock)
-            except ValueError:
-                pass
-
-            try:
-                stream_client = self.html_map.pop(sock_id)
-            except KeyError:
-                logger.info("socket has no child socket")
-            else:
-                stream_client.close()
-                try:
-                    self.stream_clients.remove(stream_client)
-                    logger.info("removed stream_client=%r", id(stream_client))
-                except ValueError:
-                    pass
-
-                try:
-                    self.sockets.remove(stream_client)
-                    logger.info("removed child sock_id=%r", id(stream_client))
-                except ValueError:
-                    pass
-
-    def render_image(self):
-        if not self.stream_clients:
-            return
-
-        #pixmap = QPixmap.grabWidget(self.widget, QtCore.QRect(10, 10, 768, 576))
-        pixmap = QPixmap.grabWindow(self.win_id, 5, 5, 768, 576)
-        buf = QBuffer()
-        buf.open(QIODevice.WriteOnly)
-        pixmap.save(buf, "JPG", 30)
-        self.img_data = buf.data()
-        len_data = len(self.img_data)
-        array = QByteArray("--2342\r\nContent-Type: image/jpeg\r\nContent-length: %d\r\n\r\n%s\r\n\r\n\r\n" % (len_data, self.img_data))
-        for sock in self.stream_clients:
-            sock.write(array)
-
-    def start_streaming(self):
-        while self.hasPendingConnections():
-            sock = self.nextPendingConnection()
-            logger.info("new connection=%r", id(sock))
-            sock.readyRead.connect(self.handle_request)
-            sock.disconnected.connect(self.remove_stream_client)
-            self.sockets.append(sock)
-
-    def stop(self):
-        for sock in self.sockets:
-            sock.close()
-            sock.deleteLater()
-        for sock in self.stream_clients:
-            sock.close()
-            sock.deleteLater()
-        self.stream_clients = list()
-        self.sockets = list()
-        self.html_map = dict()
-        self.close()
 
 
 class EditDialog(QtGui.QWidget, Ui_EditDialog):
@@ -366,10 +232,10 @@ class TextAnimation(QtCore.QObject):
         self.count += 1
 
 
-class MainWindow(KMainWindow, Ui_MainWindow):
+class MainWindow(KMainWindow, Ui_MainWindow, MjpegStreamingConsumerInterface, PsyQtClientBase):
     def __init__(self, args, parent=None):
-        super(MainWindow, self).__init__(parent)
         self.args = args
+        super(MainWindow, self).__init__()
         self.is_streaming = False
 
         self.live_center_action = None
@@ -391,11 +257,15 @@ class MainWindow(KMainWindow, Ui_MainWindow):
         self.dialog = None
         self.current_object = None
         self.current_index = -1
+        self.win_id = self.winId()
 
         self.is_auto_publish = False
 
         self.setupUi(self)
-        self.http_server = MjpegStreamingServer((args.http_host, args.http_port), self)
+        self.coords = self.live_text_rect()
+
+        self.fps = 12.5
+        self.http_server = MjpegStreamingServer((args.http_host, args.http_port), self, self.fps)
 
         self.live_text.setLineWrapMode(QtGui.QTextEdit.LineWrapMode(QtGui.QTextEdit.FixedPixelWidth))
         self.live_text.setLineWrapColumnOrWidth(768)
@@ -433,15 +303,27 @@ class MainWindow(KMainWindow, Ui_MainWindow):
         self.create_toolbar()
         self.slot_load()
 
-        app.focusChanged.connect(self.focusChanged)
+        qtapp.focusChanged.connect(self.focusChanged)
         self.start_streaming()
 
         self.show()
+
+    def pubdir(self):
+        return os.path.dirname(os.path.abspath(__file__))
+
 
     def getPreviewCoords(self):
         public_rect = self.preview_text.geometry()
         global_rect = QtCore.QRect(self.mapToGlobal(public_rect.topLeft()), self.mapToGlobal(public_rect.bottomRight()))
         return global_rect.x(), global_rect.y()
+
+
+    def render_image(self):
+        pixmap = QPixmap.grabWindow(self.win_id, self.coords.x() + 10, self.coords.y() + 10, 768, 576)
+        buf = QBuffer()
+        buf.open(QIODevice.WriteOnly)
+        pixmap.save(buf, "JPG", 75)
+        return buf.data()
 
 
     def filter_editor_actions(self):
@@ -631,9 +513,10 @@ class MainWindow(KMainWindow, Ui_MainWindow):
             self.dialog.setButtons(KDialog.ButtonCodes(KDialog.Ok | KDialog.Cancel))
             self.dialog.okClicked.connect(self.slot_save)
             self.dialog.exec_()
+        super(self, MainWindow).closeEvent(event)
 
     def live_text_rect(self):
-        return 5, 5, 768, 576
+        return self.live_text.geometry()
 
     def stop_streaming(self):
         self.is_streaming = False
@@ -643,6 +526,24 @@ class MainWindow(KMainWindow, Ui_MainWindow):
         self.http_server.listen(port=self.args.http_port)
         self.is_streaming = True
 
+    def fill_combo_box(self):
+        if self.dialog is not None:
+            self.dialog.deleteLater()
+            self.dialog = None
+
+        self.text_combo.clear()
+        current_row = -1
+        for index, list_obj in enumerate(self.model.text_db):
+            preview, text = list_obj
+            self.text_combo.addAction(preview)
+            if list_obj == self.current_object:
+                current_row = index
+
+        if current_row == -1:
+            current_row = self.current_index
+            self.slot_load_preview_text(current_row)
+        self.text_combo.setCurrentItem(current_row)
+
     def focusChanged(self, old, new):
         if new == self.preview_text:
             self.live_editor_collection.clearAssociatedWidgets()
@@ -650,13 +551,6 @@ class MainWindow(KMainWindow, Ui_MainWindow):
         elif new == self.live_text:
             self.preview_editor_collection.clearAssociatedWidgets()
             self.live_editor_collection.addAssociatedWidget(self.toolbar)
-
-    def custom_clear(self, cursor):
-        cursor.beginEditBlock()
-        cursor.movePosition(QtGui.QTextCursor.Start)
-        cursor.movePosition(QtGui.QTextCursor.End, QtGui.QTextCursor.KeepAnchor)
-        cursor.removeSelectedText()
-        cursor.endEditBlock()
 
     def slot_auto_publish(self, state):
         self.is_auto_publish = bool(state)
@@ -737,23 +631,6 @@ class MainWindow(KMainWindow, Ui_MainWindow):
         if self.fade_animation.timer is None:
             self.fade_animation.start_animation()
 
-    def fill_combo_box(self):
-        if self.dialog is not None:
-            self.dialog.deleteLater()
-            self.dialog = None
-
-        self.text_combo.clear()
-        current_row = -1
-        for index, list_obj in enumerate(self.model.text_db):
-            preview, text = list_obj
-            self.text_combo.addAction(preview)
-            if list_obj == self.current_object:
-                current_row = index
-
-        if current_row == -1:
-            current_row = self.current_index
-            self.slot_load_preview_text(current_row)
-        self.text_combo.setCurrentItem(current_row)
 
     def slot_load_preview_text(self, index):
         try:
@@ -864,9 +741,11 @@ def main():
     args = arg_parser.finalize()
 
     args.http_host, args.http_port = resolve_host(args.http_host, args.http_port, args.address_family)
+    args.chaosc_host, args.chaosc_port = resolve_host(args.chaosc_host, args.chaosc_port, args.address_family)
 
-    window = MainWindow(args)
-    app.exec_()
+    window = MainWindow(args, None)
+    sys.excepthook = window.sigint_handler
+    qtapp.exec_()
 
 
 if __name__ == '__main__':

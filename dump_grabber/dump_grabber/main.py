@@ -23,8 +23,9 @@ from __future__ import absolute_import
 import os
 import os.path
 import re
+import signal
 import sys
-
+from collections import deque
 from datetime import datetime
 from chaosc.argparser_groups import *
 from chaosc.lib import logger, resolve_host
@@ -33,7 +34,8 @@ from PyQt4.QtCore import QBuffer, QByteArray, QIODevice
 from PyQt4.QtNetwork import QTcpServer, QTcpSocket, QUdpSocket, QHostAddress
 
 from dump_grabber.dump_grabber_ui import Ui_MainWindow
-from psylib.mjpeg_streaming_server import MjpegStreamingServer
+from psylib.mjpeg_streaming_server import *
+from psylib.psyqt_base import PsyQtChaoscClientBase
 
 try:
     from chaosc.c_osc_lib import OSCMessage, decode_osc
@@ -42,62 +44,17 @@ except ImportError as e:
 
 app = QtGui.QApplication([])
 
-class TextStorage(object):
-    def __init__(self, columns):
-        super(TextStorage, self).__init__()
+class ExclusiveTextStorage(object):
+    def __init__(self, columns, default_font, column_width, line_height, scene):
         self.column_count = columns
         self.colors = (QtCore.Qt.red, QtCore.Qt.green, QtGui.QColor(46, 100, 254))
-
-    def init_columns(self):
-        raise NotImplementedError()
-
-    def add_text(self, column, text):
-        raise NotImplementedError()
-
-
-class ColumnTextStorage(TextStorage):
-    def __init__(self, columns, default_font, column_width, line_height, scene):
-        super(ColumnTextStorage, self).__init__(columns)
-        self.columns = list()
-        self.default_font = default_font
-        self.column_width = column_width
-        self.line_height = line_height
-        self.graphics_scene = scene
-        self.num_lines, self.offset = divmod(768, self.line_height)
-
-    def init_columns(self):
-        for x in range(self.column_count):
-            column = list()
-            color = self.colors[x]
-            for y in range(self.num_lines):
-                text_item = self.graphics_scene.addSimpleText("%d:%d" % (x, y), self.default_font)
-                text_item.setBrush(color)
-                text_item.setPos(x * self.column_width, y * self.line_height)
-                column.append(text_item)
-            self.columns.append(column)
-
-    def add_text(self, column, text):
-        text_item = self.graphics_scene.addSimpleText(text, self.default_font)
-        color = self.colors[column]
-        text_item.setBrush(color)
-
-        old_item = self.columns[column].pop(0)
-        self.graphics_scene.removeItem(old_item)
-        self.columns[column].append(text_item)
-        for iy, text_item in enumerate(self.columns[column]):
-            text_item.setPos(column * self.column_width, iy * self.line_height)
-
-
-class ExclusiveTextStorage(TextStorage):
-    def __init__(self, columns, default_font, column_width, line_height, scene):
-        super(ExclusiveTextStorage, self).__init__(columns)
-        self.column_count = columns
-        self.lines = list()
+        self.lines = deque()
         self.default_font = default_font
         self.column_width = column_width
         self.line_height = line_height
         self.graphics_scene = scene
         self.num_lines, self.offset = divmod(576, self.line_height)
+        self.data = deque()
 
     def init_columns(self):
         color = self.colors[0]
@@ -107,26 +64,38 @@ class ExclusiveTextStorage(TextStorage):
             text_item.setPos(0, y * self.line_height)
             self.lines.append(text_item)
 
-    def add_text(self, column, text):
+    def __add_text(self, column, text):
         text_item = self.graphics_scene.addSimpleText(text, self.default_font)
         text_item.setX(column * self.column_width)
         color = self.colors[column]
         text_item.setBrush(color)
 
-        old_item = self.lines.pop(0)
+        old_item = self.lines.popleft()
         self.graphics_scene.removeItem(old_item)
         self.lines.append(text_item)
+
+    def finish(self):
+        while 1:
+            try:
+                column, text = self.data.popleft()
+                self.__add_text(column, text)
+            except IndexError, msg:
+                break
+
+
         for iy, text_item in enumerate(self.lines):
             text_item.setY(iy * self.line_height)
 
+    def add_text(self, column, text):
+        self.data.append((column, text))
 
 
-
-
-class MainWindow(QtGui.QMainWindow, Ui_MainWindow):
-    def __init__(self, args, parent=None, columns=3, column_exclusive=False):
-        super(MainWindow, self).__init__(parent)
+class MainWindow(QtGui.QMainWindow, Ui_MainWindow, MjpegStreamingConsumerInterface, PsyQtChaoscClientBase):
+    def __init__(self, args, parent=None):
         self.args = args
+        #PsyQtChaoscClientBase.__init__(self)
+        super(MainWindow, self).__init__()
+        self.setAttribute(QtCore.Qt.WA_DeleteOnClose)
 
         self.setupUi(self)
         self.http_server = MjpegStreamingServer((args.http_host, args.http_port), self)
@@ -140,20 +109,16 @@ class MainWindow(QtGui.QMainWindow, Ui_MainWindow):
         self.graphics_view.setScene(self.graphics_scene)
         self.default_font = QtGui.QFont("Monospace", 14)
         self.default_font.setStyleHint(QtGui.QFont.Monospace)
-        self.default_font.setBold(True)
+        #self.default_font.setBold(True)
         self.graphics_scene.setFont(self.default_font)
         self.font_metrics = QtGui.QFontMetrics(self.default_font)
         self.line_height = self.font_metrics.height()
+        columns = 3
         self.column_width = 775 / columns
 
         self.text_storage = ExclusiveTextStorage(columns, self.default_font, self.column_width, self.line_height, self.graphics_scene)
         self.text_storage.init_columns()
 
-        self.osc_sock = QUdpSocket(self)
-        logger.info("osc bind localhost %d", args.client_port)
-        self.osc_sock.bind(QHostAddress("127.0.0.1"), args.client_port)
-        self.osc_sock.readyRead.connect(self.got_message)
-        self.osc_sock.error.connect(self.handle_osc_error)
         msg = OSCMessage("/subscribe")
         msg.appendTypedArg("localhost", "s")
         msg.appendTypedArg(args.client_port, "i")
@@ -164,6 +129,9 @@ class MainWindow(QtGui.QMainWindow, Ui_MainWindow):
         #self.add_text(0, "foo bar")
 
         self.regex = re.compile("^/(uwe|merle|bjoern)/(.*?)$")
+
+    def pubdir(self):
+        return os.path.dirname(os.path.abspath(__file__))
 
     def closeEvent(self, event):
         msg = OSCMessage("/unsubscribe")
@@ -179,6 +147,7 @@ class MainWindow(QtGui.QMainWindow, Ui_MainWindow):
         self.text_storage.add_text(column, text)
 
     def render_image(self):
+        self.text_storage.finish()
         image = QtGui.QImage(768, 576, QtGui.QImage.Format_ARGB32_Premultiplied)
         image.fill(QtCore.Qt.black)
         painter = QtGui.QPainter(image)
@@ -191,7 +160,7 @@ class MainWindow(QtGui.QMainWindow, Ui_MainWindow):
         painter.end()
         buf = QBuffer()
         buf.open(QIODevice.WriteOnly)
-        image.save(buf, "JPG", 80)
+        image.save(buf, "JPG", 85)
         image_data = buf.data()
         return image_data
 
@@ -207,6 +176,8 @@ class MainWindow(QtGui.QMainWindow, Ui_MainWindow):
             except AttributeError:
                 pass
             else:
+                if text == "temperatur":
+                    text += "e"
                 if actor == "merle":
                     self.add_text(0, "%s = %s" % (text, ", ".join([str(i) for i in args])))
                 elif actor == "uwe":
@@ -229,8 +200,11 @@ def main():
     args = arg_parser.finalize()
 
     http_host, http_port = resolve_host(args.http_host, args.http_port, args.address_family)
+    args.chaosc_host, args.chaosc_port = resolve_host(args.chaosc_host, args.chaosc_port, args.address_family)
+
     window = MainWindow(args)
-    #window.show()
+    sys.excepthook = window.sigint_handler
+    signal.signal(signal.SIGTERM, window.sigterm_handler)
     app.exec_()
 
 
