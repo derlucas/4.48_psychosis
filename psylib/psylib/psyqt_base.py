@@ -21,6 +21,7 @@
 from __future__ import absolute_import
 
 import sys
+import traceback
 
 from PyQt4 import QtCore, QtGui
 from PyQt4.QtCore import QBuffer, QByteArray
@@ -64,17 +65,19 @@ class PsyQtChaoscClientBase(PsyQtClientBase):
         self.osc_sock.error.connect(self.handle_osc_error)
         self.subscribe()
 
-    def sigint_handler(self, ex_cls, ex, traceback):
+    def sigint_handler(self, ex_cls, ex, tb):
         """Handler for the SIGINT signal."""
+        logger.info("sigint_handler")
         if ex_cls == KeyboardInterrupt:
             logger.info("found KeyboardInterrupt")
             self.unsubscribe()
             QtGui.QApplication.exit()
         else:
-            logger.critical(''.join(traceback.format_tb(traceback)))
+            logger.critical(''.join(traceback.format_tb(tb)))
             logger.critical('{0}: {1}'.format(ex_cls, ex))
 
     def sigterm_handler(self, *args):
+        logger.info("sigterm_handler")
         self.unsubscribe()
         QtGui.QApplication.exit()
 

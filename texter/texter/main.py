@@ -25,6 +25,7 @@ import cPickle
 import os.path
 import re
 import sys
+import traceback
 
 from PyQt4 import QtCore, QtGui
 
@@ -123,7 +124,7 @@ class EditDialog(QtGui.QWidget, Ui_EditDialog):
 
     def slot_show_text(self, model_index):
         try:
-            self.text_preview.setTextOrHtml(self.parent().parent().model.text_db[model_index.row()][1])
+            self.text_preview.setHtml(self.parent().parent().model.text_db[model_index.row()][1])
         except IndexError:
             pass
 
@@ -232,10 +233,12 @@ class TextAnimation(QtCore.QObject):
         self.count += 1
 
 
-class MainWindow(KMainWindow, Ui_MainWindow, MjpegStreamingConsumerInterface, PsyQtClientBase):
+class MainWindow(KMainWindow, Ui_MainWindow, MjpegStreamingConsumerInterface):
     def __init__(self, args, parent=None):
         self.args = args
-        super(MainWindow, self).__init__()
+        #super(MainWindow, self).__init__()
+        #PsyQtClientBase.__init__(self)
+        KMainWindow.__init__(self, parent)
         self.is_streaming = False
 
         self.live_center_action = None
@@ -257,12 +260,11 @@ class MainWindow(KMainWindow, Ui_MainWindow, MjpegStreamingConsumerInterface, Ps
         self.dialog = None
         self.current_object = None
         self.current_index = -1
-        self.win_id = self.winId()
 
         self.is_auto_publish = False
 
         self.setupUi(self)
-        self.coords = self.live_text_rect()
+        self.win_id = self.live_text.winId()
 
         self.fps = 12.5
         self.http_server = MjpegStreamingServer((args.http_host, args.http_port), self, self.fps)
@@ -307,6 +309,9 @@ class MainWindow(KMainWindow, Ui_MainWindow, MjpegStreamingConsumerInterface, Ps
         self.start_streaming()
 
         self.show()
+        timer = QtCore.QTimer()
+        timer.start(2000)
+        timer.timeout.connect(lambda: None)
 
     def pubdir(self):
         return os.path.dirname(os.path.abspath(__file__))
@@ -317,9 +322,10 @@ class MainWindow(KMainWindow, Ui_MainWindow, MjpegStreamingConsumerInterface, Ps
         global_rect = QtCore.QRect(self.mapToGlobal(public_rect.topLeft()), self.mapToGlobal(public_rect.bottomRight()))
         return global_rect.x(), global_rect.y()
 
-
     def render_image(self):
-        pixmap = QPixmap.grabWindow(self.win_id, self.coords.x() + 10, self.coords.y() + 10, 768, 576)
+        public_rect = self.live_text_rect()
+        #global_rect = QtCore.QRect(self.mapToGlobal(public_rect.topLeft()), self.mapToGlobal(public_rect.bottomRight()))
+        pixmap = QPixmap.grabWindow(self.win_id, public_rect.x() + 1, public_rect.y() + 1, 768, 576)
         buf = QBuffer()
         buf.open(QIODevice.WriteOnly)
         pixmap.save(buf, "JPG", 75)
@@ -505,6 +511,7 @@ class MainWindow(KMainWindow, Ui_MainWindow, MjpegStreamingConsumerInterface, Ps
         self.streaming_action.setChecked(True)
 
     def closeEvent(self, event):
+        logger.info("closeEvent")
         if self.db_dirty:
             self.dialog = KDialog(self)
             self.dialog.setCaption("4.48 texter - text db not saved")
@@ -513,7 +520,7 @@ class MainWindow(KMainWindow, Ui_MainWindow, MjpegStreamingConsumerInterface, Ps
             self.dialog.setButtons(KDialog.ButtonCodes(KDialog.Ok | KDialog.Cancel))
             self.dialog.okClicked.connect(self.slot_save)
             self.dialog.exec_()
-        super(self, MainWindow).closeEvent(event)
+        event.accept()
 
     def live_text_rect(self):
         return self.live_text.geometry()
@@ -719,13 +726,22 @@ class MainWindow(KMainWindow, Ui_MainWindow, MjpegStreamingConsumerInterface, Ps
             return
 
         try:
-            self.model.text_db = [list(i) for  i in cPickle.load(db_file)]
+            self.model.text_db = [list(i) for i in cPickle.load(db_file)]
         except ValueError, error:
             logger.exception(error)
 
         self.fill_combo_box()
         self.text_combo.setCurrentItem(0)
         self.slot_load_preview_text(0)
+
+    def sigint_handler(self, ex_cls, ex, tb):
+        """Handler for the SIGINT signal."""
+        if ex_cls == KeyboardInterrupt:
+            logger.info("found KeyboardInterrupt")
+            QtGui.QApplication.exit()
+        else:
+            logger.critical(''.join(traceback.format_tb(tb)))
+            logger.critical('{0}: {1}'.format(ex_cls, ex))
 
 
 def main():

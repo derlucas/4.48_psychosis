@@ -75,7 +75,7 @@ class Generator(object):
             if self.count < int(self.steps / 100. * 30):
                 value = random.randint(30, 35)
             elif self.count == int(self.steps / 100. * 30):
-                value = random.randint(random.randint(50,60), random.randint(60, 70))
+                value = random.randint(55, 66)
             elif self.count < int(self.steps / 100. * 45):
                 value = random.randint(30, 35)
             elif self.count < int(self.steps / 2.):
@@ -83,11 +83,11 @@ class Generator(object):
             elif self.count == int(self.steps / 2.):
                 value = 255
             elif self.count < int(self.steps / 100. * 60):
-                value = random.randint(random.randint(25,30), random.randint(30, 35))
+                value = random.randint(25, 35)
             elif self.count < int(self.steps / 100. * 70):
-                value = random.randint(random.randint(10,25), random.randint(25, 30))
+                value = random.randint(10, 30)
             elif self.count < self.steps:
-                value = random.randint(random.randint(15,25), random.randint(25, 30))
+                value = random.randint(15, 30)
             else:
                 self.count = 0
                 value = 30
@@ -152,11 +152,11 @@ class Actor(object):
         self.plotPoint.setData(x=[self.pre_head], y=[self.data[self.pre_head]])
 
 
-class EkgPlotWidget(PlotWidget, MjpegStreamingConsumerInterface, PsyQtChaoscClientBase):
+class EkgPlotWidget(PlotWidget, PsyQtChaoscClientBase, MjpegStreamingConsumerInterface):
     def __init__(self, args, parent=None):
         self.args = args
-        PsyQtChaoscClientBase.__init__(self)
         super(EkgPlotWidget, self).__init__()
+        PsyQtChaoscClientBase.__init__(self)
         self.setAttribute(QtCore.Qt.WA_DeleteOnClose)
 
         self.fps = 12.5
@@ -193,6 +193,10 @@ class EkgPlotWidget(PlotWidget, MjpegStreamingConsumerInterface, PsyQtChaoscClie
         self.set_positions()
         self.heartbeat_regex = re.compile("^/(.*?)/heartbeat$")
 
+        self.pull_timer = QtCore.QTimer()
+        self.pull_timer.timeout.connect(self.slot_pull_ekg)
+        self.pull_timer.start(40)
+
     def pubdir(self):
         return os.path.dirname(os.path.abspath(__file__))
 
@@ -228,9 +232,6 @@ class EkgPlotWidget(PlotWidget, MjpegStreamingConsumerInterface, PsyQtChaoscClie
 
     def render_image(self):
         for actor_obj in self.active_actors:
-            osc = actor_obj.osci
-            for i in range(actor_obj.osci_obj.multiplier):
-                actor_obj.add_value(osc.next())
             actor_obj.render()
         exporter = pg.exporters.ImageExporter.ImageExporter(self.plotItem)
         exporter.parameters()['width'] = 768
@@ -250,6 +251,10 @@ class EkgPlotWidget(PlotWidget, MjpegStreamingConsumerInterface, PsyQtChaoscClie
                 logger.exception(e)
             else:
                 self.update(osc_address, args)
+
+    def slot_pull_ekg(self):
+        for actor_obj in self.active_actors:
+            actor_obj.add_value(actor_obj.osci.next())
 
 
 

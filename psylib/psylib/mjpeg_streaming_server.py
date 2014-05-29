@@ -205,6 +205,9 @@ class MjpegStreamingServer(QTcpServer):
 
     def stop(self):
         self.stream_clients = list()
+        for sock in self.sockets:
+            sock.close()
+            sock.deleteLater()
         self.sockets = list()
         self.html_map = dict()
         self.close()

@@ -2,7 +2,7 @@
 
 # Form implementation generated from reading ui file 'edit_dialog.ui'
 #
-# Created: Sat May 17 16:15:38 2014
+# Created: Tue May 27 18:18:57 2014
 #      by: PyQt4 UI code generator 4.10.3
 #
 # WARNING! All changes made in this file will be lost!
@@ -31,7 +31,7 @@ class Ui_EditDialog(object):
         self.verticalLayout.setObjectName(_fromUtf8("verticalLayout"))
         self.horizontalLayout_2 = QtGui.QHBoxLayout()
         self.horizontalLayout_2.setObjectName(_fromUtf8("horizontalLayout_2"))
-        self.text_list = QtGui.QTableView(EditDialog)
+        self.text_list = QtGui.QListView(EditDialog)
         self.text_list.setObjectName(_fromUtf8("text_list"))
         self.horizontalLayout_2.addWidget(self.text_list)
         self.text_preview = QtGui.QTextEdit(EditDialog)

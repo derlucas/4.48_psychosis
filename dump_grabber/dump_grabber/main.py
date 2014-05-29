@@ -119,15 +119,6 @@ class MainWindow(QtGui.QMainWindow, Ui_MainWindow, MjpegStreamingConsumerInterfa
         self.text_storage = ExclusiveTextStorage(columns, self.default_font, self.column_width, self.line_height, self.graphics_scene)
         self.text_storage.init_columns()
 
-        msg = OSCMessage("/subscribe")
-        msg.appendTypedArg("localhost", "s")
-        msg.appendTypedArg(args.client_port, "i")
-        msg.appendTypedArg(self.args.authenticate, "s")
-        if self.args.subscriber_label is not None:
-            msg.appendTypedArg(self.args.subscriber_label, "s")
-        self.osc_sock.writeDatagram(QByteArray(msg.encode_osc()), QHostAddress("127.0.0.1"), 7110)
-        #self.add_text(0, "foo bar")
-
         self.regex = re.compile("^/(uwe|merle|bjoern)/(.*?)$")
 
     def pubdir(self):
