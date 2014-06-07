@@ -49,6 +49,11 @@ class MjpegStreamingConsumerInterface(object):
         raise NotImplementedError()
 
 class MjpegStreamingServer(QTcpServer):
+    """A simple async http class which provides a mjpeg stream and if found,
+        an index.html file containing the mjpeg stream.
+
+        Parent should implement the interface 'MjpegStreamingConsumerInterface'
+    """
 
     def __init__(self, server_address, parent=None, fps=12.5):
         super(MjpegStreamingServer, self).__init__(parent)
@@ -73,7 +78,8 @@ class MjpegStreamingServer(QTcpServer):
         sock = self.sender()
         sock_id = id(sock)
         logger.info("handle_request: sock_id=%r", sock_id)
-        if sock.state() in (QTcpSocket.UnconnectedState, QTcpSocket.ClosingState):
+        if sock.state() in (
+            QTcpSocket.UnconnectedState, QTcpSocket.ClosingState):
             logger.info("connection closed")
             self.sockets.remove(sock)
             sock.deleteLater()
@@ -85,7 +91,9 @@ class MjpegStreamingServer(QTcpServer):
         logger.info("first line: %r", line)
         try:
             resource, ext, http_version = self.get_regex.match(line).groups()
-            logger.info("resource=%r, ext=%r, http_version=%r", resource, ext, http_version)
+            logger.info(
+                "resource=%r, ext=%r, http_version=%r",
+                resource, ext, http_version)
         except AttributeError:
             try:
                 host, port = self.host_regex.match(line).groups()
@@ -101,24 +109,30 @@ class MjpegStreamingServer(QTcpServer):
             if ext == "ico":
                 directory = self.widget.pubdir()
                 try:
-                    data = open(os.path.join(directory, "favicon.ico"), "rb").read()
+                    data = open(
+                        os.path.join(directory, "favicon.ico"), "rb").read()
                 except IOError:
-                    logger.error("request not found/handled - sending 404 not found")
+                    logger.error(
+                        "request not found/handled - sending 404 not found")
                     sock.write("HTTP/1.1 404 Not Found\r\n")
                     return
                 else:
-                    sock.write(QByteArray('HTTP/1.1 200 Ok\r\nContent-Type: image/x-ico\r\n\r\n%s' % data))
+                    sock.write(QByteArray('HTTP/1.1 200 Ok\r\nContent-Type:' \
+                        'image/x-ico\r\n\r\n%s' % data))
             elif ext == "html":
                 directory = self.widget.pubdir()
                 try:
-                    data = open(os.path.join(directory, "index.html"), "rb").read() % sock_id
+                    data = open(os.path.join(
+                        directory, "index.html"), "rb").read() % sock_id
                     self.html_map[sock_id] = None
                 except IOError:
-                    logger.error("request not found/handled - sending 404 not found")
+                    logger.error(
+                        "request not found/handled - sending 404 not found")
                     sock.write("HTTP/1.1 404 Not Found\r\n")
                     return
                 else:
-                    sock.write(QByteArray('HTTP/1.1 200 Ok\r\nContent-Type: text/html;encoding: utf-8\r\n\r\n%s' % data))
+                    sock.write(QByteArray('HTTP/1.1 200 Ok\r\nContent-Type:"\
+                        "text/html;encoding: utf-8\r\n\r\n%s' % data))
             elif ext == "mjpeg":
                 try:
                     _, html_sock_id = resource.split("_", 1)
@@ -131,9 +145,12 @@ class MjpegStreamingServer(QTcpServer):
                     if html_sock_id is not None:
                         self.html_map[html_sock_id] = sock
                     self.stream_clients.append(sock)
-                    sock.write(QByteArray('HTTP/1.1 200 Ok\r\nContent-Type: multipart/x-mixed-replace; boundary=--2342\r\n\r\n'))
+                    sock.write(QByteArray('HTTP/1.1 200 Ok\r\n" \
+                        "Content-Type: multipart/x-mixed-replace;" \
+                        "boundary=--2342\r\n\r\n'))
             else:
-                logger.error("request not found/handled - sending 404 not found")
+                logger.error(
+                    "request not found/handled - sending 404 not found")
                 sock.write("HTTP/1.1 404 Not Found\r\n")
 
     def slot_remove_connection(self):
@@ -155,35 +172,36 @@ class MjpegStreamingServer(QTcpServer):
         except ValueError, msg:
             logger.info("connection %r was not stored?", sock_id)
 
-
         try:
             self.stream_clients.remove(sock)
         except ValueError:
             logger.info("connection %r was not streaming", sock_id)
 
-
+        # cleaning up streaming connections if that sock is serving index.html
         try:
             stream_client = self.html_map.pop(sock_id)
         except KeyError:
-            logger.info("socket %r has no child socket", sock_id)
+            logger.info("connection %r has no child connections", sock_id)
         else:
             try:
                 stream_client.close()
+                stream_client.deleteLater()
             except AttributeError, msg:
                 logger.info("no stream client")
             else:
                 try:
                     self.stream_clients.remove(stream_client)
-                    logger.info("child connection %r removed from streaming", id(stream_client))
+                    logger.info("child connection %r removed from streaming",
+                                id(stream_client))
                 except ValueError:
                     pass
 
                 try:
                     self.sockets.remove(stream_client)
-                    logger.info("child connection %r removed from storage", id(stream_client))
+                    logger.info("child connection %r removed from storage",
+                                id(stream_client))
                 except ValueError:
                     pass
-
 
     def send_image(self):
         if not self.stream_clients:
@@ -191,7 +209,8 @@ class MjpegStreamingServer(QTcpServer):
 
         img_data = self.widget.render_image()
         len_data = len(img_data)
-        array = QByteArray("--2342\r\nContent-Type: image/jpeg\r\nContent-length: %d\r\n\r\n%s\r\n\r\n\r\n" % (len_data, img_data))
+        array = QByteArray("--2342\r\nContent-Type: image/jpeg\r\n" \
+            "Content-length: %d\r\n\r\n%s\r\n\r\n\r\n" % (len_data, img_data))
         for sock in self.stream_clients:
             sock.write(array)
 

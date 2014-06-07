@@ -1,30 +1,25 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 
-# This file is part of sensors2osc package
+# This file is part of psychose/ekgplotter package
 #
-# sensors2osc is free software: you can redistribute it and/or modify
+# psychose/ekgplotter is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation, either version 3 of the License, or
 # (at your option) any later version.
 #
-# sensors2osc is distributed in the hope that it will be useful,
+# psychose/ekgplotter is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
 #
 # You should have received a copy of the GNU General Public License
-# along with sensors2osc.  If not, see <http://www.gnu.org/licenses/>.
-#
-# found the mjpeg part here, thanks for the nice code :)
-# http://hardsoftlucid.wordpress.com/2013/04/11/mjpeg-server-for-webcam-in-python-with-opencv/
-# the osc integration stuff is implemented by me
+# along with psychose/ekgplotter.  If not, see <http://www.gnu.org/licenses/>.
 #
 # Copyright (C) 2014 Stefan Kögl
 
 from __future__ import absolute_import
 
-import atexit
 import random
 import os.path
 import re
@@ -33,13 +28,15 @@ import sys
 import exceptions
 
 from PyQt4 import QtCore, QtGui
-from PyQt4.QtCore import QBuffer, QByteArray, QIODevice
-from PyQt4.QtNetwork import QUdpSocket, QHostAddress
+from PyQt4.QtGui import QImage, QPixmap, QMainWindow
+from PyQt4.QtCore import QBuffer, QIODevice
 
 import numpy as np
 
 import pyqtgraph as pg
 from pyqtgraph.widgets.PlotWidget import PlotWidget
+from pyqtgraph.graphicsItems.PlotCurveItem import PlotCurveItem
+from pyqtgraph.graphicsItems.ScatterPlotItem import ScatterPlotItem
 
 from chaosc.argparser_groups import ArgParser
 from chaosc.lib import logger, resolve_host
@@ -47,9 +44,9 @@ from psylib.mjpeg_streaming_server import *
 from psylib.psyqt_base import PsyQtChaoscClientBase
 
 try:
-    from chaosc.c_osc_lib import OSCMessage, decode_osc
+    from chaosc.c_osc_lib import decode_osc
 except ImportError as e:
-    from chaosc.osc_lib import OSCMessage, decode_osc
+    from chaosc.osc_lib import decode_osc
 
 qtapp = QtGui.QApplication([])
 
@@ -67,8 +64,8 @@ class Generator(object):
         self.count = 0
         self.pulse = random.randint(85, 105)
         self.delta = delta
-        self.multiplier = 4
-        self.steps, _ = get_steps(self.pulse, delta / self.multiplier)
+        self.finished = False
+        self.steps, _ = get_steps(self.pulse, delta / 4)
 
     def __call__(self):
         while 1:
@@ -89,6 +86,7 @@ class Generator(object):
             elif self.count < self.steps:
                 value = random.randint(15, 30)
             else:
+                self.finished = True
                 self.count = 0
                 value = 30
 
@@ -97,8 +95,7 @@ class Generator(object):
 
     def set_pulse(self, pulse):
         self.pulse = pulse
-        self.steps, _ = get_steps(pulse, self.delta / self.multiplier)
-
+        self.steps, _ = get_steps(pulse, self.delta)
 
     def retrigger(self):
         self.count = self.steps / 2
@@ -112,37 +109,33 @@ class Actor(object):
         self.ix = ix
         self.max_actors = max_actors
         self.actor_height = actor_height
-        self.updated = 0
-
         self.offset = ix * actor_height
-        self.data = np.array([self.offset] * num_data)
+        self.data = np.array([self.offset + 30] * num_data)
         self.head = 0
         self.pre_head = 0
-        self.plotItem = pg.PlotCurveItem(pen=pg.mkPen(color, width=3), width=4, name=name)
-        #self.plotItem.setShadowPen(pg.mkPen("w", width=5))
-        self.plotPoint = pg.ScatterPlotItem(pen=pg.mkPen("w", width=5), brush=pg.mkBrush(color), size=5)
+        self.plotItem = PlotCurveItem(pen=pg.mkPen(color, width=3), width=4, name=name)
+        self.plotPoint = ScatterPlotItem(pen=pg.mkPen("w", width=5), brush=pg.mkBrush(color), size=5)
         self.osci = None
         self.osci_obj = None
+        self.render()
 
     def __str__(self):
         return "<Actor name:%r, position=%r>" % (self.name, self.head)
 
-    __repr__ = __str__
-
+    def __repr__(self):
+        return "Actor(%r, %r, %r, %r, %r, %r)" % (self.name, self.num_data,
+            self.color, self.ix, self.max_actors, self.actor_height)
 
     def add_value(self, value):
-        dp = self.head
-        self.data[dp] = value / self.max_actors + self.offset
-        self.pre_head = dp
-        self.head = (dp + 1) % self.num_data
-        self.updated += 1
+        self.pre_head = self.head
+        self.data[self.pre_head] = value / self.max_actors + self.offset
+        self.head = (self.pre_head + 1) % self.num_data
 
     def fill_missing(self, count):
         dp = self.head
         for i in range(count):
             self.data[dp] = self.offset
             dp = (dp + 1) % self.num_data
-            self.updated += 1
 
         self.pre_head = (dp - 1) % self.num_data
         self.head = dp
@@ -151,41 +144,47 @@ class Actor(object):
         self.plotItem.setData(y=self.data, clear=True)
         self.plotPoint.setData(x=[self.pre_head], y=[self.data[self.pre_head]])
 
+class PlotWindow(PlotWidget):
+    def __init__(self, title=None, **kargs):
+        self.win = QtGui.QMainWindow()
+        self.win.resize(768, 576)
+        PlotWidget.__init__(self, **kargs)
+        self.win.setCentralWidget(self)
+        for m in ['resize']:
+            setattr(self, m, getattr(self.win, m))
+        if title is not None:
+            self.win.setWindowTitle(title)
+        self.win.show()
 
-class EkgPlotWidget(PlotWidget, PsyQtChaoscClientBase, MjpegStreamingConsumerInterface):
+
+class EkgPlotWidget(QMainWindow, PsyQtChaoscClientBase, MjpegStreamingConsumerInterface):
     def __init__(self, args, parent=None):
         self.args = args
         super(EkgPlotWidget, self).__init__()
         PsyQtChaoscClientBase.__init__(self)
-        self.setAttribute(QtCore.Qt.WA_DeleteOnClose)
-
-        self.fps = 12.5
-        self.http_server = MjpegStreamingServer((args.http_host, args.http_port), self, self.fps)
-        self.http_server.listen(port=args.http_port)
-
-        self.num_data = 100
-
-        self.hide()
-        self.showGrid(False, False)
-        self.setYRange(0, 255)
-        self.setXRange(0, self.num_data)
-        self.resize(768, 576)
+        self.plot_widget = PlotWidget(title="Psychose - EkgPlotter")
         colors = ["r", "g", "b"]
-
-        ba = self.getAxis("bottom")
-        bl = self.getAxis("left")
-        ba.setTicks([])
-        bl.setTicks([])
-        ba.hide()
-        bl.hide()
         self.active_actors = list()
-
         self.actors = dict()
-
         self.max_value = 255
         actor_names = ["merle", "uwe", "bjoern"]
         self.max_actors = len(actor_names)
         self.actor_height = self.max_value / self.max_actors
+        self.fps = 12.5
+        self.http_server = MjpegStreamingServer((args.http_host, args.http_port), self, self.fps)
+        self.http_server.listen(port=args.http_port)
+        self.num_data = 100
+        self.plot_widget.showGrid(False, False)
+        self.plot_widget.setYRange(0, 255)
+        self.plot_widget.setXRange(0, self.num_data)
+        self.plot_widget.resize(768, 576)
+
+        bottom_axis = self.plot_widget.getAxis("bottom")
+        left_axis = self.plot_widget.getAxis("left")
+        bottom_axis.setTicks([])
+        left_axis.setTicks([])
+        bottom_axis.hide()
+        left_axis.hide()
 
         for ix, (actor_name, color) in enumerate(zip(actor_names, colors)):
             self.add_actor(actor_name, self.num_data, color, ix, self.max_actors, self.actor_height)
@@ -193,21 +192,16 @@ class EkgPlotWidget(PlotWidget, PsyQtChaoscClientBase, MjpegStreamingConsumerInt
         self.set_positions()
         self.heartbeat_regex = re.compile("^/(.*?)/heartbeat$")
 
-        self.pull_timer = QtCore.QTimer()
-        self.pull_timer.timeout.connect(self.slot_pull_ekg)
-        self.pull_timer.start(40)
-
     def pubdir(self):
         return os.path.dirname(os.path.abspath(__file__))
-
 
     def add_actor(self, actor_name, num_data, color, ix, max_actors, actor_height):
         actor_obj = Actor(actor_name, num_data, color, ix, max_actors, actor_height)
         self.actors[actor_name] = actor_obj
-        self.addItem(actor_obj.plotItem)
-        self.addItem(actor_obj.plotPoint)
+        self.plot_widget.addItem(actor_obj.plotItem)
+        self.plot_widget.addItem(actor_obj.plotPoint)
         self.active_actors.append(actor_obj)
-        actor_obj.osci_obj = Generator(delta=self.http_server.timer_delta)
+        actor_obj.osci_obj = Generator(pulse=random.randint(88, 104), delta=self.http_server.timer_delta)
         actor_obj.osci = actor_obj.osci_obj()
 
     def set_positions(self):
@@ -219,7 +213,6 @@ class EkgPlotWidget(PlotWidget, PsyQtChaoscClientBase, MjpegStreamingConsumerInt
         return self.max_actors
 
     def update(self, osc_address, args):
-
         res = self.heartbeat_regex.match(osc_address)
         if res:
             actor_name = res.group(1)
@@ -229,16 +222,25 @@ class EkgPlotWidget(PlotWidget, PsyQtChaoscClientBase, MjpegStreamingConsumerInt
                 actor_obj.osci_obj.retrigger()
             actor_obj.osci_obj.set_pulse(args[1])
 
-
     def render_image(self):
         for actor_obj in self.active_actors:
+            actor_obj.add_value(actor_obj.osci.next())
+            actor_obj.add_value(actor_obj.osci.next())
+            actor_obj.add_value(actor_obj.osci.next())
+            actor_obj.add_value(actor_obj.osci.next())
             actor_obj.render()
-        exporter = pg.exporters.ImageExporter.ImageExporter(self.plotItem)
-        exporter.parameters()['width'] = 768
-        img = exporter.export(toBytes=True)
+        image = QPixmap(768, 576)
+        image.fill(QtCore.Qt.white)
+        painter = QtGui.QPainter(image)
+        painter.setRenderHints(QtGui.QPainter.RenderHint(
+            QtGui.QPainter.Antialiasing | QtGui.QPainter.TextAntialiasing),
+            True)
+        scene = self.plot_widget.plotItem.scene()
+        scene.render(painter, QtCore.QRectF(0, 0, 768, 576), QtCore.QRectF(0, 0, 768, 576))
+        painter.end()
         buf = QBuffer()
         buf.open(QIODevice.WriteOnly)
-        img.save(buf, "JPG", 75)
+        image.save(buf, "JPG", 80)
         JpegData = buf.data()
         return JpegData
 
@@ -247,15 +249,10 @@ class EkgPlotWidget(PlotWidget, PsyQtChaoscClientBase, MjpegStreamingConsumerInt
             data, address, port = self.osc_sock.readDatagram(self.osc_sock.pendingDatagramSize())
             try:
                 osc_address, typetags, args = decode_osc(data, 0, len(data))
-            except Exception, e:
-                logger.exception(e)
+            except ValueError, error:
+                logger.exception(error)
             else:
                 self.update(osc_address, args)
-
-    def slot_pull_ekg(self):
-        for actor_obj in self.active_actors:
-            actor_obj.add_value(actor_obj.osci.next())
-
 
 
 def main():
@@ -274,8 +271,10 @@ def main():
     args.chaosc_host, args.chaosc_port = resolve_host(args.chaosc_host, args.chaosc_port, args.address_family)
 
     window = EkgPlotWidget(args)
-    sys.excepthook = window.sigint_handler
-    signal.signal(signal.SIGTERM, window.sigterm_handler)
+    logger.info("foooooooo")
+    window.hide()
+    #sys.excepthook = window.sigint_handler
+    #signal.signal(signal.SIGTERM, window.sigterm_handler)
     qtapp.exec_()
 
 

@@ -1,9 +1,6 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 
-from distribute_setup import use_setuptools
-use_setuptools()
-
 import sys
 from setuptools import find_packages, setup
 
@@ -12,7 +9,7 @@ if sys.version_info >= (3,):
 
 setup(
     name='psylib',
-    version="0.1",
+    version="0.2",
     packages=find_packages(exclude=["scripts",]),
 
     include_package_data = True,
