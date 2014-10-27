@@ -63,6 +63,7 @@ public class MainForm {
             }
         });
         snmpTimer.setRepeats(true);
+        snmpStatClient.start();
 
 
         if(showErrors) {
@@ -76,6 +77,8 @@ public class MainForm {
             pulse3.hide();
             statDisplay.hide();
         }
+
+
     }
 
 
@@ -143,6 +146,7 @@ public class MainForm {
             }
         });
     }
+
 
 
 

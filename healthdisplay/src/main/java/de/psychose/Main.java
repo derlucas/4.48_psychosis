@@ -41,6 +41,7 @@ public class Main {
                 @Override
                 public void windowClosing(WindowEvent e) {
                     chaOSCclient.stopReceiver();
+                    snmp.stopRunning();
                     super.windowClosing(e);
                 }
             });

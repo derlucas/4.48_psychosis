@@ -21,19 +21,22 @@ import java.util.List;
  * @author: lucas
  * @date: 18.04.14 12:10
  */
-public class SnmpStatClient {
+public class SnmpStatClient extends Thread {
+    private final int napTime = 5000;
     public static final String OID_COUNTER = "1.3.6.1.2.1.2.2.1.10";
     private HashMap<Integer, Long> lastPorts = new HashMap<>();
     private HashMap<Integer, Long> sumPorts = new HashMap<>();
     private Snmp snmp;
     private CommunityTarget communityTarget;
+    private long currentTrafficSum = 0;
+    private Boolean doRun = true;
 
     private CommunityTarget getCommunityTarget(String host) {
         CommunityTarget communityTarget = new CommunityTarget();
         communityTarget.setCommunity(new OctetString("public"));
         communityTarget.setVersion(SnmpConstants.version2c);
         communityTarget.setAddress(new UdpAddress(host));
-        communityTarget.setTimeout(100);
+        communityTarget.setTimeout(300);
         return communityTarget;
     }
 
@@ -46,15 +49,44 @@ public class SnmpStatClient {
             this.snmp = new Snmp(transportMapping);
 
         } catch (IOException e) {
+            e.printStackTrace();
             System.out.println("error: cannot get traffic from snmp target");
         }
     }
 
-    public long getTrafficSum() {
+    public void stopRunning() {
+        doRun = false;
+    }
 
+    @Override
+    public void run() {
         if (snmp == null || this.communityTarget == null) {
             System.out.println("snmp error");
-            return 0;
+            doRun = false;
+        }
+
+        while (doRun && !Thread.interrupted()) {
+            long sleepTill = System.currentTimeMillis() + napTime;
+
+            getSNMPValues();
+
+            try {
+                long remainingTime = sleepTill - System.currentTimeMillis();
+                if (remainingTime > 0)
+                    Thread.sleep(remainingTime);
+            } catch (InterruptedException e) {
+                return;
+            }
+
+        }
+
+    }
+
+    private void getSNMPValues() {
+        if (snmp == null || this.communityTarget == null) {
+            System.out.println("snmp error");
+            doRun = false;
+            return;
         }
 
         long sum = 0;
@@ -87,7 +119,11 @@ public class SnmpStatClient {
             sum += port;
         }
 
-        return sum;
+        currentTrafficSum = sum;
+    }
+
+    public long getTrafficSum() {
+       return currentTrafficSum;
     }
 
 }
