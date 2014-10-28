@@ -28,6 +28,7 @@ import time
 import sys
 
 from chaosc.argparser_groups import ArgParser
+from chaosc.lib import logger
 
 
 try:
@@ -47,8 +48,8 @@ class Platform(object):
 
 
     def connect(self):
-        print "connect serial"
-        print "waiting for the device %r to come up" % self.args.device
+        logger.info("connect serial")
+        logger.info("waiting for the device %r to come up", self.args.device)
         self.serial_sock = serial.Serial()
         self.serial_sock.port = self.args.device
         self.serial_sock.baudrate = 115200
@@ -57,7 +58,7 @@ class Platform(object):
             try:
                 self.serial_sock.open()
             except (serial.serialutil.SerialException, os.error), e:
-                print "serial error", e
+                logger.exception(e)
                 time.sleep(0.5)
                 pass
             else:
@@ -66,12 +67,12 @@ class Platform(object):
 
     def close(self):
         if self.serial_sock is not None:
-            print "close serial"
+            logger.info("close serial")
             self.serial_sock.close()
 
 
     def reconnect(self):
-        print "reconnect serial"
+        logger.info("reconnect serial")
         self.close()
         self.connect()
 

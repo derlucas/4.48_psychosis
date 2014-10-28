@@ -1,2 +1,2 @@
-pyuic4 -o texter_ui.py texter3.ui
-pyuic4 -o text_sorter_ui.py texter4.ui
+# pyuic4 -o texter_ui.py texter.ui
+pyuic4 -o edit_dialog_ui.py edit_dialog.ui

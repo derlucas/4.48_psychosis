@@ -29,7 +29,6 @@ import datetime
 try:
     from chaosc.c_osc_lib import OSCMessage
 except ImportError as e:
-    print(e)
     from chaosc.osc_lib import OSCMessage
 
 
@@ -48,7 +47,7 @@ class Forwarder(object):
 
     def close(self):
         """Close all resources and unpublish service"""
-        print "%s: closing..." % (self.device, )
+        logger.info("%s: closing...", self.device)
         self.serial.close()
 
 
@@ -58,7 +57,6 @@ class EHealth2OSC(Forwarder):
 
     def handle_read(self, osc_sock):
         data = self.serial.readline()[:-2]
-        print repr(data)
         try:
             airFlow, emg, temp = data.split(";")
         except ValueError:
@@ -106,7 +104,7 @@ class RingBuffer(object):
         self.head = (self.head + 1) % self.length
 
     def getData(self):
-        print "getData", self.ring_buf, self.head
+        #print "getData", self.ring_buf, self.head
         data = list()
         for i in range(7, 1, -1):
             value = self.ring_buf[(self.head - i) % self.length]
@@ -146,7 +144,7 @@ class Pulse2OSC(Forwarder):
                     osc_message.appendTypedArg(heart_rate, "i")
                     osc_message.appendTypedArg(o2, "i")
                     osc_sock.sendall(osc_message.encode_osc())
-                    print "heartbeat", datetime.datetime.now(), heart_signal
+                    #print "heartbeat", datetime.datetime.now(), heart_signal
                     self.heartbeat_on = True
                 elif pulse == 1 and self.heartbeat_on:
                     #print "off heartbeat", datetime.datetime.now(), heart_signal

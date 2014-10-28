@@ -2,7 +2,7 @@
 
 # Form implementation generated from reading ui file 'dump_grabber.ui'
 #
-# Created: Wed Apr 16 22:18:59 2014
+# Created: Tue May 13 06:55:09 2014
 #      by: PyQt4 UI code generator 4.10.3
 #
 # WARNING! All changes made in this file will be lost!
@@ -27,6 +27,19 @@ class Ui_MainWindow(object):
     def setupUi(self, MainWindow):
         MainWindow.setObjectName(_fromUtf8("MainWindow"))
         MainWindow.resize(811, 606)
+        font = QtGui.QFont()
+        font.setFamily(_fromUtf8("Monospace"))
+        font.setPointSize(14)
+        font.setItalic(True)
+        MainWindow.setFont(font)
+        self.centralwidget = QtGui.QWidget(MainWindow)
+        self.centralwidget.setObjectName(_fromUtf8("centralwidget"))
+        self.verticalLayout = QtGui.QVBoxLayout(self.centralwidget)
+        self.verticalLayout.setObjectName(_fromUtf8("verticalLayout"))
+        self.horizontalLayout = QtGui.QHBoxLayout()
+        self.horizontalLayout.setObjectName(_fromUtf8("horizontalLayout"))
+        self.graphics_view = QtGui.QGraphicsView(self.centralwidget)
+        self.graphics_view.setMinimumSize(QtCore.QSize(785, 580))
         palette = QtGui.QPalette()
         brush = QtGui.QBrush(QtGui.QColor(255, 255, 255))
         brush.setStyle(QtCore.Qt.SolidPattern)
@@ -163,23 +176,11 @@ class Ui_MainWindow(object):
         brush = QtGui.QBrush(QtGui.QColor(0, 0, 0))
         brush.setStyle(QtCore.Qt.SolidPattern)
         palette.setBrush(QtGui.QPalette.Disabled, QtGui.QPalette.ToolTipText, brush)
-        MainWindow.setPalette(palette)
-        self.centralwidget = QtGui.QWidget(MainWindow)
-        self.centralwidget.setObjectName(_fromUtf8("centralwidget"))
-        self.verticalLayout = QtGui.QVBoxLayout(self.centralwidget)
-        self.verticalLayout.setObjectName(_fromUtf8("verticalLayout"))
-        self.horizontalLayout = QtGui.QHBoxLayout()
-        self.horizontalLayout.setObjectName(_fromUtf8("horizontalLayout"))
-        self.graphics_view = QtGui.QGraphicsView(self.centralwidget)
-        self.graphics_view.setMinimumSize(QtCore.QSize(785, 580))
-        self.graphics_view.setAutoFillBackground(True)
+        self.graphics_view.setPalette(palette)
+        self.graphics_view.setAutoFillBackground(False)
         self.graphics_view.setObjectName(_fromUtf8("graphics_view"))
         self.horizontalLayout.addWidget(self.graphics_view)
-        spacerItem = QtGui.QSpacerItem(40, 20, QtGui.QSizePolicy.Expanding, QtGui.QSizePolicy.Minimum)
-        self.horizontalLayout.addItem(spacerItem)
         self.verticalLayout.addLayout(self.horizontalLayout)
-        spacerItem1 = QtGui.QSpacerItem(20, 4, QtGui.QSizePolicy.Minimum, QtGui.QSizePolicy.Expanding)
-        self.verticalLayout.addItem(spacerItem1)
         MainWindow.setCentralWidget(self.centralwidget)
 
         self.retranslateUi(MainWindow)

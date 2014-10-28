@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 
-# Form implementation generated from reading ui file 'texter3.ui'
+# Form implementation generated from reading ui file 'texter.ui'
 #
-# Created: Mon Apr 21 22:38:51 2014
+# Created: Sat May 10 18:57:19 2014
 #      by: PyQt4 UI code generator 4.10.3
 #
 # WARNING! All changes made in this file will be lost!
@@ -26,7 +26,7 @@ except AttributeError:
 class Ui_MainWindow(object):
     def setupUi(self, MainWindow):
         MainWindow.setObjectName(_fromUtf8("MainWindow"))
-        MainWindow.resize(1475, 651)
+        MainWindow.resize(1475, 592)
         palette = QtGui.QPalette()
         brush = QtGui.QBrush(QtGui.QColor(255, 255, 255))
         brush.setStyle(QtCore.Qt.SolidPattern)
@@ -47,6 +47,11 @@ class Ui_MainWindow(object):
         brush.setStyle(QtCore.Qt.SolidPattern)
         palette.setBrush(QtGui.QPalette.Disabled, QtGui.QPalette.Base, brush)
         MainWindow.setPalette(palette)
+        font = QtGui.QFont()
+        font.setFamily(_fromUtf8("Helvetica"))
+        font.setPointSize(8)
+        font.setBold(True)
+        MainWindow.setFont(font)
         icon = QtGui.QIcon()
         icon.addPixmap(QtGui.QPixmap(_fromUtf8(":/texter/icon.png")), QtGui.QIcon.Normal, QtGui.QIcon.Off)
         MainWindow.setWindowIcon(icon)
@@ -57,8 +62,8 @@ class Ui_MainWindow(object):
         self.horizontalLayout = QtGui.QHBoxLayout()
         self.horizontalLayout.setObjectName(_fromUtf8("horizontalLayout"))
         self.live_text = KRichTextWidget(self.centralwidget)
-        self.live_text.setMinimumSize(QtCore.QSize(775, 582))
-        self.live_text.setMaximumSize(QtCore.QSize(775, 582))
+        self.live_text.setMinimumSize(QtCore.QSize(778, 586))
+        self.live_text.setMaximumSize(QtCore.QSize(778, 586))
         palette = QtGui.QPalette()
         brush = QtGui.QBrush(QtGui.QColor(0, 0, 0))
         brush.setStyle(QtCore.Qt.SolidPattern)
@@ -102,7 +107,7 @@ class Ui_MainWindow(object):
         self.live_text.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
         self.live_text.setAcceptRichText(True)
         self.live_text.setTextInteractionFlags(QtCore.Qt.LinksAccessibleByKeyboard|QtCore.Qt.LinksAccessibleByMouse|QtCore.Qt.TextBrowserInteraction|QtCore.Qt.TextEditable|QtCore.Qt.TextEditorInteraction|QtCore.Qt.TextSelectableByKeyboard|QtCore.Qt.TextSelectableByMouse)
-        self.live_text.setRichTextSupport(KRichTextWidget.RichTextSupportValues(KRichTextWidget.SupportAlignment|KRichTextWidget.SupportChangeListStyle|KRichTextWidget.SupportFontFamily|KRichTextWidget.SupportFontSize|KRichTextWidget.SupportTextForegroundColor))
+        self.live_text.setRichTextSupport(KRichTextWidget.RichTextSupportValues(KRichTextWidget.SupportAlignment|KRichTextWidget.SupportFontFamily|KRichTextWidget.SupportFontSize|KRichTextWidget.SupportTextForegroundColor))
         self.live_text.setObjectName(_fromUtf8("live_text"))
         self.horizontalLayout.addWidget(self.live_text)
         self.preview_text = KRichTextWidget(self.centralwidget)
@@ -111,8 +116,8 @@ class Ui_MainWindow(object):
         sizePolicy.setVerticalStretch(0)
         sizePolicy.setHeightForWidth(self.preview_text.sizePolicy().hasHeightForWidth())
         self.preview_text.setSizePolicy(sizePolicy)
-        self.preview_text.setMinimumSize(QtCore.QSize(300, 582))
-        self.preview_text.setMaximumSize(QtCore.QSize(769, 582))
+        self.preview_text.setMinimumSize(QtCore.QSize(300, 586))
+        self.preview_text.setMaximumSize(QtCore.QSize(778, 586))
         palette = QtGui.QPalette()
         brush = QtGui.QBrush(QtGui.QColor(0, 0, 0))
         brush.setStyle(QtCore.Qt.SolidPattern)
@@ -140,11 +145,7 @@ class Ui_MainWindow(object):
         self.preview_text.setRichTextSupport(KRichTextWidget.RichTextSupportValues(KRichTextWidget.SupportAlignment|KRichTextWidget.SupportChangeListStyle|KRichTextWidget.SupportFontFamily|KRichTextWidget.SupportFontSize|KRichTextWidget.SupportTextForegroundColor))
         self.preview_text.setObjectName(_fromUtf8("preview_text"))
         self.horizontalLayout.addWidget(self.preview_text)
-        spacerItem = QtGui.QSpacerItem(40, 20, QtGui.QSizePolicy.MinimumExpanding, QtGui.QSizePolicy.Minimum)
-        self.horizontalLayout.addItem(spacerItem)
         self.verticalLayout.addLayout(self.horizontalLayout)
-        spacerItem1 = QtGui.QSpacerItem(20, 40, QtGui.QSizePolicy.Minimum, QtGui.QSizePolicy.Expanding)
-        self.verticalLayout.addItem(spacerItem1)
         MainWindow.setCentralWidget(self.centralwidget)
 
         self.retranslateUi(MainWindow)
