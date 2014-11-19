@@ -174,8 +174,6 @@ class MainWindow(QtGui.QMainWindow, Ui_MainWindow,
             except AttributeError:
                 pass
             else:
-                if text == "temperatur":
-                    text += "e"
                 if actor == "merle":
                     self.add_text(0, "%s = %s" % (
                         text, ", ".join([str(i) for i in args])))

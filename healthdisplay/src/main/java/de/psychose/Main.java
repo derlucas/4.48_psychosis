@@ -148,7 +148,7 @@ public class Main {
             }
         });
 
-        chaOSCclient.addListener("/" + actor.toLowerCase() + "/temperatur", new OSCListener() {
+        chaOSCclient.addListener("/" + actor.toLowerCase() + "/temperature", new OSCListener() {
             @Override
             public void acceptMessage(Date time, OSCMessage message) {
                 if (message.getArguments().length == 1) {
