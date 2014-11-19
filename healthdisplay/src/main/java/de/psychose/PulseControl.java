@@ -35,7 +35,7 @@ public class PulseControl extends Observable {
                 int pulse = pulseWobbleCenter - PULSE_WOBBLE_WIDTH / 2 + random.nextInt(PULSE_WOBBLE_WIDTH);
 
                 if(pulse < 60) pulse = 60;
-                if(pulse > 180) pulse = 180;
+                if(pulse > 230) pulse = 230;
 
                 final PulseData data = new PulseData(heartbeat, pulse, 95 + random.nextInt(4));
                 setChanged();
@@ -51,7 +51,6 @@ public class PulseControl extends Observable {
         enableCheckBox.addItemListener(new ItemListener() {
             @Override
             public void itemStateChanged(ItemEvent e) {
-                System.out.println("item state changed");
                 JCheckBox checkBox = (JCheckBox)e.getSource();
                 if(checkBox.isSelected()) {
                     if(!timer.isRunning()) {
@@ -67,10 +66,6 @@ public class PulseControl extends Observable {
 
             }
         });
-    }
-
-    public void hide() {
-        this.pulsePanel.setVisible(false);
     }
 
 }

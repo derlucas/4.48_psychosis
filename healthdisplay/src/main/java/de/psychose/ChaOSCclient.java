@@ -23,7 +23,12 @@ public class ChaOSCclient {
 
     public ChaOSCclient(String host, int port) throws UnknownHostException, SocketException {
         portOut = new OSCPortOut(InetAddress.getByName(host), port);
-        portIn = new OSCPortIn(OSC_CLIENT_PORT);
+        try {
+            portIn = new OSCPortIn(OSC_CLIENT_PORT);
+        } catch (SocketException se) {
+            System.out.println("Port " + OSC_CLIENT_PORT + " already in use. Trying " + OSC_CLIENT_PORT + 1);
+            portIn = new OSCPortIn(OSC_CLIENT_PORT + 1);
+        }
     }
 
     public void addListener(String address, OSCListener listener) {

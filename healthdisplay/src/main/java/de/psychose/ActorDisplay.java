@@ -3,6 +3,7 @@ package de.psychose;
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.ActionEvent;
+import java.text.DecimalFormat;
 
 /**
  * @author: lucas
@@ -14,7 +15,6 @@ public class ActorDisplay {
     private final static Color offColor = Color.RED;
     private final static String offText = "no data";
 
-    private JPanel actorPanel;
     private JLabel lblCaption;
     private JLabel lblHeartbeat;
     private JLabel lblPulse;
@@ -23,54 +23,32 @@ public class ActorDisplay {
     private JLabel lblEmg;
     private JLabel lblTemperature;
     private JLabel lblBreath;
+    private JPanel actorPanel;
+    private ActorData actorData;
+    private boolean showErrors = false;
+    private DecimalFormat df = new DecimalFormat("#.0");
 
-    private int counterHeartbeat = 0;
-    private int counterPulse = 0;
-    private int counterOxy = 0;
-    private int counterEkg = 0;
-    private int counterEmg = 0;
-    private int counterTemperature = 0;
-    private int counterBreath = 0;
+    //TODO: die einzelnen Setter wegmachen, dafür eine setData() bauen die die daten en bloc nimmt
+    // die darin enthaltenen timestamps dann für rotfärbung nehmen
 
-    private int timeout = 20;   // 20 * 100ms
+    public void setActorData(ActorData actorData) {
+        this.actorData = actorData;
+    }
 
     public void setCaption(String caption) {
         lblCaption.setText(caption);
     }
 
-    public void setBreath(String breath) {
-        lblBreath.setText(breath);
-        counterBreath = 0;
-    }
+    public void update() {
+        lblBreath.setText(String.valueOf(actorData.getAirflow()));
 
-    public void setTemperature(String temperature) {
-        lblTemperature.setText(temperature);
-        counterTemperature = 0;
-    }
+        lblTemperature.setText(df.format(actorData.getTemperature()));
+        lblEkg.setText(String.valueOf(actorData.getEkg()));
+        lblPulse.setText(actorData.getPulseData().getHeartbeat() == 0 ? "systole" : "diastole");
+        lblEmg.setText(String.valueOf(actorData.getEmg()));
+        lblOxy.setText(String.valueOf(actorData.getPulseData().getOxygen()));
+        lblHeartbeat.setText(String.valueOf(actorData.getPulseData().getPulse()));
 
-    public void setEkg(String value) {
-        lblEkg.setText(value);
-        counterEkg = 0;
-    }
-
-    public void setPulse(String pulse) {
-        lblPulse.setText(pulse);
-        counterPulse = 0;
-    }
-
-    public void setEmg(String emg) {
-        lblEmg.setText(emg);
-        counterEmg = 0;
-    }
-
-    public void setOxy(String oxy) {
-        lblOxy.setText(oxy);
-        counterOxy = 0;
-    }
-
-    public void setHeartbeat(String heartbeat) {
-        lblHeartbeat.setText(heartbeat);
-        counterHeartbeat = 0;
     }
 
     public ActorDisplay() {
@@ -78,62 +56,65 @@ public class ActorDisplay {
             @Override
             public void actionPerformed(ActionEvent e) {
 
-                if (++counterTemperature > timeout) {
-                    lblTemperature.setForeground(offColor);
-                    lblTemperature.setText(offText);
-                } else {
-                    lblTemperature.setForeground(onColor);
-                }
+                if (actorData == null)
+                    return;
 
-                if (++counterPulse > timeout) {
-                    lblPulse.setForeground(offColor);
-                    lblPulse.setText(offText);
-                } else {
-                    lblPulse.setForeground(onColor);
-                }
+                update();
 
-                if (++counterOxy > timeout) {
-                    lblOxy.setForeground(offColor);
-                    lblOxy.setText(offText);
-                } else {
-                    lblOxy.setForeground(onColor);
-                }
+                if (showErrors) {
 
-                if (++counterEkg > timeout) {
-                    lblEkg.setForeground(offColor);
-                    lblEkg.setText(offText);
-                } else {
-                    lblEkg.setForeground(onColor);
-                }
+                    long timeout = System.currentTimeMillis() - 1000;
 
-                if (++counterEmg > timeout) {
-                    lblEmg.setForeground(offColor);
-                    lblEmg.setText(offText);
-                } else {
-                    lblEmg.setForeground(onColor);
-                }
+                    if (actorData.getTimestampTemperature() < timeout) {
+                        lblTemperature.setForeground(offColor);
+                        lblTemperature.setText(offText);
+                    } else {
+                        lblTemperature.setForeground(onColor);
+                    }
 
-                if (++counterHeartbeat > timeout) {
-                    lblHeartbeat.setForeground(offColor);
-                    lblHeartbeat.setText(offText);
-                } else {
-                    lblHeartbeat.setForeground(onColor);
-                }
+                    if (actorData.getTimestampPulse() < timeout) {
+                        lblPulse.setForeground(offColor);
+                        lblPulse.setText(offText);
+                        lblOxy.setForeground(offColor);
+                        lblOxy.setText(offText);
+                        lblHeartbeat.setForeground(offColor);
+                        lblHeartbeat.setText(offText);
+                    } else {
+                        lblPulse.setForeground(onColor);
+                        lblOxy.setForeground(onColor);
+                        lblHeartbeat.setForeground(onColor);
+                    }
 
-                if (++counterBreath > timeout) {
-                    lblBreath.setForeground(offColor);
-                    lblBreath.setText(offText);
-                } else {
-                    lblBreath.setForeground(onColor);
+                    if (actorData.getTimestampEkg() < timeout) {
+                        lblEkg.setForeground(offColor);
+                        lblEkg.setText(offText);
+                    } else {
+                        lblEkg.setForeground(onColor);
+                    }
+
+                    if (actorData.getTimestampEmg() < timeout) {
+                        lblEmg.setForeground(offColor);
+                        lblEmg.setText(offText);
+                    } else {
+                        lblEmg.setForeground(onColor);
+                    }
+
+                    if (actorData.getTimestampBreath() < timeout) {
+                        lblBreath.setForeground(offColor);
+                        lblBreath.setText(offText);
+                    } else {
+                        lblBreath.setForeground(onColor);
+                    }
                 }
             }
         });
-        this.timer.setRepeats(true);
+
+        timer.setRepeats(true);
+        timer.start();
     }
 
-    public void startErrorTimer() {
-        this.timer.start();
+    public void setShowErrors(boolean showErrors) {
+        this.showErrors = showErrors;
     }
-
 }
 
