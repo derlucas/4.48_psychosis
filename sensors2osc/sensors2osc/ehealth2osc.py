@@ -79,14 +79,14 @@ def main():
 
 
         try:
-            temp = int(temp)
+            temp = float(temp)
         except ValueError, msg:
             logger.exception(msg)
             continue
 
         try:
-            osc_message = OSCMessage("/%s/temperatur" % actor)
-            osc_message.appendTypedArg(temp, "i")
+            osc_message = OSCMessage("/%s/temperature" % actor)
+            osc_message.appendTypedArg(temp, "f")
             platform.osc_sock.sendto(osc_message.encode_osc(), platform.remote)
         except socket.error, msg:
             logger.exception(msg)
