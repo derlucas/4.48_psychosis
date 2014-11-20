@@ -1,0 +1,1 @@
+(if (contains (window_name) "VLC media player") (undecorate))
