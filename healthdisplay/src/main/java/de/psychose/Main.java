@@ -4,8 +4,6 @@ import com.illposed.osc.OSCListener;
 import com.illposed.osc.OSCMessage;
 
 import javax.swing.*;
-import java.awt.event.WindowAdapter;
-import java.awt.event.WindowEvent;
 import java.net.SocketException;
 import java.net.UnknownHostException;
 import java.util.Date;
@@ -15,26 +13,17 @@ import java.util.Date;
  * @date: 25.04.14 00:23
  */
 public class Main {
-    private ChaOSCclient chaOSCclient;
-    private ControlForm controlForm;
-    private MainForm mainForm;
-
-    private int totalMessageCount = 0;
-    private int messagesTempCounter = 0;
-
-    private long totalTraffic = 0;
-    private long lastTraffic = 0;
-
-    private final ActorData actorData1 = new ActorData();
-    private final ActorData actorData2 = new ActorData();
-    private final ActorData actorData3 = new ActorData();
-
 
     public static void main(String[] args) {
         new Main();
     }
 
     public Main() {
+        final ActorData[] actorDatas = new ActorData[3];
+        actorDatas[0] = new ActorData("merle", "Körper 1");
+        actorDatas[1] = new ActorData("uwe", "Körper 2");
+        actorDatas[2] = new ActorData("bjoern", "Körper 3");
+
         try {
             UIManager.setLookAndFeel("com.sun.java.swing.plaf.gtk.GTKLookAndFeel");
         } catch (Exception e) {
@@ -42,151 +31,99 @@ public class Main {
         }
 
         try {
-            this.chaOSCclient = new ChaOSCclient("chaosc", 7110);
-            this.controlForm = new ControlForm(chaOSCclient, actorData1, actorData2, actorData3);
+            final ChaOSCclient chaOSCclient = new ChaOSCclient("chaosc", 7110);
 
-            final JFrame cframe = new JFrame("HD Control");
-            cframe.setContentPane(controlForm.getMainPanel());
-            cframe.setResizable(false);
-            cframe.setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE);
-            cframe.pack();
-
-
-            this.mainForm = new MainForm(actorData1, actorData2, actorData3);
-            final JFrame frame = new JFrame("HD Main");
-            frame.setContentPane(mainForm.getMainPanel());
-            frame.setResizable(false);
-            frame.setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE);
-//            frame.setExtendedState(JFrame.MAXIMIZED_BOTH);
-            frame.setUndecorated(true);
-            frame.pack();
-
-            frame.addWindowListener(new WindowAdapter() {
-                @Override
-                public void windowClosing(WindowEvent e) {
-                    chaOSCclient.stopReceiver();
-//                    snmp.stopRunning();
-                    super.windowClosing(e);
-                }
-            });
-
-
-            addActor("merle", actorData1);
-            addActor("uwe", actorData2);
-            addActor("bjoern", actorData3);
-
-            cframe.setVisible(true);
-            frame.setVisible(true);
+            for(int i = 0; i < actorDatas.length; i++) {
+                addActorOSCListeners(chaOSCclient, actorDatas[i]);
+            }
 
             chaOSCclient.startReceiver();
+
+            new ControlForm(chaOSCclient, actorDatas);
+            new MainForm(actorDatas);
+
+            Runtime.getRuntime().addShutdownHook(new Thread(new Runnable() {
+                @Override
+                public void run() {
+                    chaOSCclient.stopReceiver();
+                }
+            }));
 
         } catch (UnknownHostException | SocketException e) {
             e.printStackTrace();
         }
-
     }
 
-    private void addActor(final String actor, final ActorData actorData) {
+    private static void addActorOSCListeners(final ChaOSCclient chaOSCclient, final ActorData actorData) {
 
-        chaOSCclient.addListener("/" + actor.toLowerCase() + "/heartbeat", new OSCListener() {
+        chaOSCclient.addListener("/" + actorData.getActor().toLowerCase() + "/heartbeat", new OSCListener() {
             @Override
             public void acceptMessage(Date time, OSCMessage message) {
                 if (message.getArguments().length == 3) {
-                    totalMessageCount++;
 
+                    // set the beat ( 0 or 1 )
+                    if (message.getArguments()[0] instanceof Integer) {
+                        actorData.setHeartbeat( (int)(message.getArguments()[0]) == 1);
+                    }
+
+                    // set the heartrate
                     if (message.getArguments()[1] instanceof Integer) {
-                        int pulse = (int) (message.getArguments()[1]);
-
-                        if (pulse > 60) {      // try to skip the invalid pulserate from device
-
-                            // set the heartrate
-                            actorData.getPulseData().setPulse((int) (message.getArguments()[1]));
-
-                            // set the beat ( 0 or 1 )
-                            if (message.getArguments()[0] instanceof Integer) {
-                                actorData.getPulseData().setHeartbeat((int) (message.getArguments()[0]));
-                            }
-
-                            //TODO: remove this, its for testing without tommy only
-                            actorData.setTommyHeartbeat(((int) message.getArguments()[0]) == 1);
-
-                            // set the oxy level
-                            if (message.getArguments()[2] instanceof Integer) {
-                                actorData.getPulseData().setOxygen((int) (message.getArguments()[2]));
-                            }
-
-                            actorData.setTimestampPulse();
+                        final int pulse = (int) (message.getArguments()[1]);
+                        if (pulse > 60) {      // try to skip the invalid pulse rate from device
+                            actorData.setPulse(pulse);
                         }
                     }
-                }
-            }
-        });
 
-        chaOSCclient.addListener("/" + actor.toLowerCase() + "/ekg", new OSCListener() {
-            @Override
-            public void acceptMessage(Date time, OSCMessage message) {
-                if (message.getArguments().length == 1) {
-                    totalMessageCount++;
-
-                    if (message.getArguments()[0] instanceof Integer) {
-                        actorData.setEkg((int) (message.getArguments()[0]));
+                    // set the oxy level
+                    if (message.getArguments()[2] instanceof Integer) {
+                        actorData.setOxygen((int) (message.getArguments()[2]));
                     }
                 }
             }
         });
 
-        chaOSCclient.addListener("/" + actor.toLowerCase() + "/emg", new OSCListener() {
+        chaOSCclient.addListener("/" + actorData.getActor().toLowerCase() + "/ekg", new OSCListener() {
             @Override
             public void acceptMessage(Date time, OSCMessage message) {
-                if (message.getArguments().length == 1) {
-                    totalMessageCount++;
-
-                    if (message.getArguments()[0] instanceof Integer) {
-                        actorData.setEmg((int) (message.getArguments()[0]));
-                    }
+                if (message.getArguments().length == 1 && message.getArguments()[0] instanceof Integer) {
+                    actorData.setEkg((int) (message.getArguments()[0]));
                 }
             }
         });
 
-        chaOSCclient.addListener("/" + actor.toLowerCase() + "/temperature", new OSCListener() {
+        chaOSCclient.addListener("/" + actorData.getActor().toLowerCase() + "/emg", new OSCListener() {
             @Override
             public void acceptMessage(Date time, OSCMessage message) {
-                if (message.getArguments().length == 1) {
-                    totalMessageCount++;
-
-                    if (message.getArguments()[0] instanceof Float) {
-                        actorData.setTemperature((float) (message.getArguments()[0]));
-                    }
+                if (message.getArguments().length == 1 && message.getArguments()[0] instanceof Integer) {
+                    actorData.setEmg((int) (message.getArguments()[0]));
                 }
             }
         });
 
-        chaOSCclient.addListener("/" + actor.toLowerCase() + "/airFlow", new OSCListener() {
+        chaOSCclient.addListener("/" + actorData.getActor().toLowerCase() + "/temperature", new OSCListener() {
             @Override
             public void acceptMessage(Date time, OSCMessage message) {
-                if (message.getArguments().length == 1) {
-                    totalMessageCount++;
-
-                    if (message.getArguments()[0] instanceof Integer) {
-                        actorData.setAirflow((int) (message.getArguments()[0]));
-                    }
+                if (message.getArguments().length == 1 && message.getArguments()[0] instanceof Float) {
+                    actorData.setTemperature((float) (message.getArguments()[0]));
                 }
             }
         });
 
-        chaOSCclient.addListener("/" + actor.toLowerCase() + "/tommypuls", new OSCListener() {
+        chaOSCclient.addListener("/" + actorData.getActor().toLowerCase() + "/airFlow", new OSCListener() {
             @Override
             public void acceptMessage(Date time, OSCMessage message) {
-                if (message.getArguments().length == 1) {
-                    totalMessageCount++;
-
-                    if (message.getArguments()[0] instanceof Integer) {
-                        actorData.setTommyHeartbeat((boolean) (message.getArguments()[0]));
-                    }
-                    //TODO: evtl muss das oben hier noch anders
+                if (message.getArguments().length == 1 && message.getArguments()[0] instanceof Integer) {
+                    actorData.setAirflow((int) (message.getArguments()[0]));
                 }
             }
         });
 
+        //TODO: evtl muss das oben hier noch anders
+        chaOSCclient.addListener("/" + actorData.getActor().toLowerCase() + "/tommyheartbeat", new OSCListener() {
+            @Override
+            public void acceptMessage(Date time, OSCMessage message) {
+                actorData.setTommyHeartbeat(!actorData.getTommyHeartbeat());
+            }
+        });
     }
 }

@@ -45,21 +45,21 @@ public class ChaOSCclient {
         return changeChaoscSubscription(true);
     }
 
-    public void sendPulse(String actor, int heartbeat, int pulse, int oxygen) {
-
+    public void sendMessage(final String address, Object... args) {
         try {
-            OSCMessage subscribeMessage = new OSCMessage("/" + actor + "/heartbeat");
-            subscribeMessage.addArgument(heartbeat);
-            subscribeMessage.addArgument(pulse);
-            subscribeMessage.addArgument(oxygen);
+            OSCMessage subscribeMessage = new OSCMessage(address);
+
+            for(Object param: args) {
+                subscribeMessage.addArgument(param);
+            }
 
             portOut.send(subscribeMessage);
         } catch (IOException e) {
             System.out.println("could not send pulse OSC Message");
             e.printStackTrace();
         }
-    }
 
+    }
 
     private boolean changeChaoscSubscription(boolean subscribe) {
         try {

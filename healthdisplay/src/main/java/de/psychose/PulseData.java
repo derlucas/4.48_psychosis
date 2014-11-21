@@ -6,7 +6,7 @@ package de.psychose;
  */
 public class PulseData {
 
-    private int heartbeat;
+    private boolean heartbeat;
     private int pulse;
     private int oxygen;
 
@@ -14,17 +14,17 @@ public class PulseData {
 
     }
 
-    public PulseData(int heartbeat, int pulse, int oxygen) {
+    public PulseData(boolean heartbeat, int pulse, int oxygen) {
         this.heartbeat = heartbeat;
         this.pulse = pulse;
         this.oxygen = oxygen;
     }
 
-    public int getHeartbeat() {
+    public boolean getHeartbeat() {
         return heartbeat;
     }
 
-    public void setHeartbeat(int heartbeat) {
+    public void setHeartbeat(boolean heartbeat) {
         this.heartbeat = heartbeat;
     }
 

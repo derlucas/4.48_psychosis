@@ -6,34 +6,63 @@ package de.psychose;
  */
 public class ActorData {
 
+    private String actor = "";
+    private String caption = "";
     private PulseData pulseData = new PulseData();
     private int airflow;
     private int ekg;
     private int emg;
-    private float temperature;
+    private double temperature;
+    private double temperatureOffset;
     private boolean tommyHeartbeat;
 
     private long timestampPulse = 0;
-    private long timestampTommyPulse = 0;
+    private long timestampHeartbeat = 0;
+    private long timestampOxygen = 0;
+    private long timestampTommyHeartbeat = 0;
     private long timestampEkg = 0;
     private long timestampEmg = 0;
     private long timestampTemperature = 0;
     private long timestampBreath = 0;
 
-    // TODO: hier die timestamps setzen wann letztes mal geändert,
-    // dann kann ich in ActorDisplay im Timer einfach prüfen ob differenz > timeout, dann rot setzen
-
-
-    public void setTimestampPulse() {
-        this.timestampPulse = System.currentTimeMillis();
-    }
-    public PulseData getPulseData() {
-        return pulseData;
+    public ActorData(String actor, String caption) {
+        this.actor = actor;
+        this.caption = caption;
     }
 
-    public void setPulseData(PulseData pulseData) {
-        this.pulseData = pulseData;
-        this.timestampPulse = System.currentTimeMillis();
+    public String getActor() {
+        return actor;
+    }
+
+    public String getCaption() {
+        return caption;
+    }
+
+    public int getOxygen() {
+        return pulseData.getOxygen();
+    }
+
+    public void setOxygen(int oxygen) {
+        timestampOxygen = System.currentTimeMillis();
+        pulseData.setOxygen(oxygen);
+    }
+
+    public boolean getHeartbeat() {
+        return pulseData.getHeartbeat();
+    }
+
+    public void setHeartbeat(boolean heartbeat) {
+        timestampHeartbeat = System.currentTimeMillis();
+        pulseData.setHeartbeat(heartbeat);
+    }
+
+    public int getPulse() {
+        return pulseData.getPulse();
+    }
+
+    public void setPulse(int pulse) {
+        timestampPulse = System.currentTimeMillis();
+        pulseData.setPulse(pulse);
     }
 
     public int getAirflow() {
@@ -63,11 +92,11 @@ public class ActorData {
         this.timestampEmg = System.currentTimeMillis();
     }
 
-    public float getTemperature() {
+    public double getTemperature() {
         return temperature;
     }
 
-    public void setTemperature(float temperature) {
+    public void setTemperature(double temperature) {
         this.temperature = temperature;
         this.timestampTemperature = System.currentTimeMillis();
     }
@@ -78,7 +107,15 @@ public class ActorData {
 
     public void setTommyHeartbeat(boolean tommyHeartbeat) {
         this.tommyHeartbeat = tommyHeartbeat;
-        this.timestampTommyPulse = System.currentTimeMillis();
+        this.timestampTommyHeartbeat = System.currentTimeMillis();
+    }
+
+    public double getTemperatureOffset() {
+        return temperatureOffset;
+    }
+
+    public void setTemperatureOffset(double temperatureOffset) {
+        this.temperatureOffset = temperatureOffset;
     }
 
     public long getTimestampPulse() {
@@ -99,5 +136,27 @@ public class ActorData {
 
     public long getTimestampBreath() {
         return timestampBreath;
+    }
+
+    @Override
+    public String toString() {
+        return "ActorData{" +
+                "actor='" + actor + '\'' +
+                ", caption='" + caption + '\'' +
+                ", airflow=" + airflow +
+                ", ekg=" + ekg +
+                ", emg=" + emg +
+                ", temperature=" + temperature +
+                ", temperatureOffset=" + temperatureOffset +
+                ", tommyHeartbeat=" + tommyHeartbeat +
+                ", timestampPulse=" + timestampPulse +
+                ", timestampHeartbeat=" + timestampHeartbeat +
+                ", timestampOxygen=" + timestampOxygen +
+                ", timestampTommyHeartbeat=" + timestampTommyHeartbeat +
+                ", timestampEkg=" + timestampEkg +
+                ", timestampEmg=" + timestampEmg +
+                ", timestampTemperature=" + timestampTemperature +
+                ", timestampBreath=" + timestampBreath +
+                '}';
     }
 }
