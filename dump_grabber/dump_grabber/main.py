@@ -204,6 +204,7 @@ def main():
         args.chaosc_host, args.chaosc_port, args.address_family)
 
     window = MainWindow(args)
+    window.show()
     sys.excepthook = window.sigint_handler
     signal.signal(signal.SIGTERM, window.sigterm_handler)
     QTAPP.exec_()
