@@ -2,7 +2,7 @@
 
 # Form implementation generated from reading ui file 'dump_grabber.ui'
 #
-# Created: Wed Dec  3 17:45:11 2014
+# Created: Wed Dec  3 19:47:52 2014
 #      by: PyQt4 UI code generator 4.10.4
 #
 # WARNING! All changes made in this file will be lost!
@@ -26,10 +26,10 @@ except AttributeError:
 class Ui_MainWindow(object):
     def setupUi(self, MainWindow):
         MainWindow.setObjectName(_fromUtf8("MainWindow"))
-        MainWindow.resize(811, 606)
+        MainWindow.resize(640, 480)
         font = QtGui.QFont()
         font.setFamily(_fromUtf8("Monospace"))
-        font.setPointSize(14)
+        font.setPointSize(12)
         font.setItalic(True)
         MainWindow.setFont(font)
         self.centralwidget = QtGui.QWidget(MainWindow)
@@ -39,7 +39,7 @@ class Ui_MainWindow(object):
         self.horizontalLayout = QtGui.QHBoxLayout()
         self.horizontalLayout.setObjectName(_fromUtf8("horizontalLayout"))
         self.graphics_view = QtGui.QGraphicsView(self.centralwidget)
-        self.graphics_view.setMinimumSize(QtCore.QSize(785, 580))
+        self.graphics_view.setMinimumSize(QtCore.QSize(640, 480))
         palette = QtGui.QPalette()
         brush = QtGui.QBrush(QtGui.QColor(255, 255, 255))
         brush.setStyle(QtCore.Qt.SolidPattern)

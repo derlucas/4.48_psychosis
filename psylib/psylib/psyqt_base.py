@@ -84,7 +84,8 @@ class PsyQtChaoscClientBase(PsyQtClientBase):
     def subscribe(self):
         logger.info("subscribe")
         msg = OSCMessage("/subscribe")
-        msg.appendTypedArg("localhost", "s")
+        logger.info(self.args.client_host)
+        msg.appendTypedArg(self.args.client_host, "s")
         msg.appendTypedArg(self.args.client_port, "i")
         msg.appendTypedArg(self.args.authenticate, "s")
         if self.args.subscriber_label is not None:
@@ -94,7 +95,7 @@ class PsyQtChaoscClientBase(PsyQtClientBase):
     def unsubscribe(self):
         logger.info("unsubscribe")
         msg = OSCMessage("/unsubscribe")
-        msg.appendTypedArg("localhost", "s")
+        msg.appendTypedArg(self.args.client_host, "s")
         msg.appendTypedArg(self.args.client_port, "i")
         msg.appendTypedArg(self.args.authenticate, "s")
         self.osc_sock.writeDatagram(QByteArray(msg.encode_osc()), QHostAddress(self.args.chaosc_host), self.args.chaosc_port)

@@ -118,7 +118,7 @@ class EkgPlotWidget(QMainWindow):
         self.max_actors = len(actor_names)
         self.actor_height = self.max_value / self.max_actors
         self.fps = 12.5
-        self.num_data = 640
+        self.num_data = 100
         self.plot_widget.showGrid(False, False)
         self.plot_widget.setYRange(0, 255)
         self.plot_widget.setXRange(0, self.num_data)
@@ -196,7 +196,7 @@ class EkgPlotWidget(QMainWindow):
             actor_name = res.group(1)
             actor_obj = self.actors[actor_name]
             actor_obj.add_value(args[0])
-            # logger.info("actor: %r, %r", actor_name, args)
+            logger.info("actor: %r, %r", actor_name, args)
 
     def render_image(self):
         for actor_obj in self.active_actors:
@@ -212,6 +212,7 @@ class EkgPlotWidget(QMainWindow):
     def got_message(self):
         while self.osc_sock.hasPendingDatagrams():
             data, address, port = self.osc_sock.readDatagram(self.osc_sock.pendingDatagramSize())
+            print data,address,port
             try:
                 osc_address, typetags, args = decode_osc(data, 0, len(data))
                 self.update(osc_address, args)
@@ -234,6 +235,7 @@ def main():
     args.chaosc_host, args.chaosc_port = resolve_host(args.chaosc_host, args.chaosc_port, args.address_family)
 
     window = EkgPlotWidget(args)
+    window.setWindowFlags(QtCore.Qt.FramelessWindowHint)
     logger.info("foooooooo")
     window.setWindowTitle("EKGPlotterMain")
     window.show()

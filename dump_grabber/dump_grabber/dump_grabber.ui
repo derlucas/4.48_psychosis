@@ -6,14 +6,14 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>811</width>
-    <height>606</height>
+    <width>640</width>
+    <height>480</height>
    </rect>
   </property>
   <property name="font">
    <font>
     <family>Monospace</family>
-    <pointsize>14</pointsize>
+    <pointsize>12</pointsize>
     <italic>true</italic>
    </font>
   </property>
@@ -28,8 +28,8 @@
        <widget class="QGraphicsView" name="graphics_view">
         <property name="minimumSize">
          <size>
-          <width>785</width>
-          <height>580</height>
+          <width>640</width>
+          <height>480</height>
          </size>
         </property>
         <property name="palette">

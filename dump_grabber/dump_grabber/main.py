@@ -58,13 +58,13 @@ class ExclusiveTextStorage(object):
         self.column_width = column_width
         self.line_height = line_height
         self.graphics_scene = scene
-        self.num_lines, self.offset = divmod(576, self.line_height)
+        self.num_lines, self.offset = divmod(480, self.line_height)
         self.data = deque()
 
     def init_columns(self):
         color = self.colors[0]
         for line_index in range(self.num_lines):
-            text_item = self.graphics_scene.addSimpleText("", self.default_font)
+            text_item = self.graphics_scene.addSimpleText("fooooo", self.default_font)
             text_item.setBrush(color)
             text_item.setPos(0, line_index * self.line_height)
             self.lines.append(text_item)
@@ -89,8 +89,7 @@ class ExclusiveTextStorage(object):
         self.data.append((column, text))
 
 
-class MainWindow(QtGui.QMainWindow, Ui_MainWindow,
-                 MjpegStreamingConsumerInterface, PsyQtChaoscClientBase):
+class MainWindow(QtGui.QMainWindow, Ui_MainWindow, PsyQtChaoscClientBase):
 
     """This app receives per actor osc messages and provides an mjpeg stream
     with colored text representation arranged in columns"""
@@ -99,9 +98,7 @@ class MainWindow(QtGui.QMainWindow, Ui_MainWindow,
         self.args = args
         super(MainWindow, self).__init__()
         self.setupUi(self)
-        self.http_server = MjpegStreamingServer(
-            (args.http_host, args.http_port), self)
-        self.http_server.listen(port=args.http_port)
+        
         self.graphics_view.setHorizontalScrollBarPolicy(
             QtCore.Qt.ScrollBarAlwaysOff)
         self.graphics_view.setVerticalScrollBarPolicy(
@@ -109,33 +106,32 @@ class MainWindow(QtGui.QMainWindow, Ui_MainWindow,
         self.graphics_view.setRenderHint(QtGui.QPainter.Antialiasing, True)
         self.graphics_view.setFrameStyle(QtGui.QFrame.NoFrame)
         self.graphics_scene = QtGui.QGraphicsScene(self)
-        self.graphics_scene.setSceneRect(0, 0, 775, 580)
+        self.graphics_scene.setSceneRect(0, 0, 640, 480)
         self.graphics_view.setScene(self.graphics_scene)
-        self.default_font = QtGui.QFont("Monospace", 14)
+        self.default_font = QtGui.QFont("Monospace", 12)
         self.default_font.setStyleHint(QtGui.QFont.Monospace)
         self.default_font.setBold(True)
         self.graphics_scene.setFont(self.default_font)
         self.font_metrics = QtGui.QFontMetrics(self.default_font)
         self.line_height = self.font_metrics.height()
         columns = 3
-        self.column_width = 775 / columns
+        self.column_width = 640 / columns
         self.text_storage = ExclusiveTextStorage(columns, self.default_font,
                                                  self.column_width,
                                                  self.line_height,
                                                  self.graphics_scene)
         self.text_storage.init_columns()
         self.regex = re.compile("^/(uwe|merle|bjoern)/(.*?)$")
+        self.osc_sock.readyRead.connect(self.got_message)
+        self.timer = QtCore.QTimer()
+        self.timer.timeout.connect(self.render_image)
+        self.timer.start(100)
 
     def pubdir(self):
         return os.path.dirname(os.path.abspath(__file__))
 
     def closeEvent(self, event):
-        msg = OSCMessage("/unsubscribe")
-        msg.appendTypedArg("localhost", "s")
-        msg.appendTypedArg(self.args.client_port, "i")
-        msg.appendTypedArg(self.args.authenticate, "s")
-        self.osc_sock.writeDatagram(
-            QByteArray(msg.encode_osc()), QHostAddress("127.0.0.1"), 7110)
+        self.unsubscribe()
 
     def handle_osc_error(self, error):
         logger.info("osc socket error %d", error)
@@ -144,24 +140,31 @@ class MainWindow(QtGui.QMainWindow, Ui_MainWindow,
         self.text_storage.add_text(column, text)
 
     def render_image(self):
+        #print "render_iamge"
         self.text_storage.finish()
-        image = QPixmap(768, 576)
-        image.fill(QtCore.Qt.black)
-        painter = QPainter(image)
-        painter.setRenderHints(QPainter.RenderHint(
-            QPainter.Antialiasing | QPainter.TextAntialiasing), True)
-        painter.setFont(self.default_font)
-        self.graphics_view.render(
-            painter, target=QtCore.QRectF(0, 0, 768, 576),
-            source=QtCore.QRect(0, 0, 768, 576))
-        painter.end()
-        buf = QBuffer()
-        buf.open(QIODevice.WriteOnly)
-        image.save(buf, "JPG", 100)
-        image_data = buf.data()
-        return image_data
+        #image = QPixmap(768, 576)
+        #image.fill(QtCore.Qt.black)
+        #painter = QPainter(image)
+        #painter.setRenderHints(QPainter.RenderHint(
+        #    QPainter.Antialiasing | QPainter.TextAntialiasing), True)
+        #painter.setFont(self.default_font)
+        #self.graphics_view.render(
+        #    painter, target=QtCore.QRectF(0, 0, 768, 576),
+        #    source=QtCore.QRect(0, 0, 768, 576))
+        #painter.end()
+        #buf = QBuffer()
+        #buf.open(QIODevice.WriteOnly)
+        #image.save(buf, "JPG", 100)
+        #image_data = buf.data()
+        #return image_data
 
     def got_message(self):
+        def convert(value):
+            if isinstance(value, float):
+                return "%.1f" % value
+            else:
+                return str(value)
+
         while self.osc_sock.hasPendingDatagrams():
             data, address, port = self.osc_sock.readDatagram(
                 self.osc_sock.pendingDatagramSize())
@@ -176,13 +179,13 @@ class MainWindow(QtGui.QMainWindow, Ui_MainWindow,
             else:
                 if actor == "merle":
                     self.add_text(0, "%s = %s" % (
-                        text, ", ".join([str(i) for i in args])))
+                        text, ", ".join([convert(i) for i in args])))
                 elif actor == "uwe":
                     self.add_text(1, "%s = %s" % (
-                        text, ", ".join([str(i) for i in args])))
+                        text, ", ".join([convert(i) for i in args])))
                 elif actor == "bjoern":
                     self.add_text(2, "%s = %s" % (
-                        text, ", ".join([str(i) for i in args])))
+                        text, ", ".join([convert(i) for i in args])))
         return True
 
 
@@ -198,12 +201,13 @@ def main():
     arg_parser.add_subscriber_group()
     args = arg_parser.finalize()
 
-    args.http_host, args.http_port = resolve_host(
-        args.http_host, args.http_port, args.address_family)
-    args.chaosc_host, args.chaosc_port = resolve_host(
-        args.chaosc_host, args.chaosc_port, args.address_family)
+    #args.http_host, args.http_port = resolve_host(
+    #    args.http_host, args.http_port, args.address_family)
+    #args.chaosc_host, args.chaosc_port = resolve_host(
+    #    args.chaosc_host, args.chaosc_port, args.address_family)
 
     window = MainWindow(args)
+    window.setWindowFlags(QtCore.Qt.FramelessWindowHint)
     window.show()
     sys.excepthook = window.sigint_handler
     signal.signal(signal.SIGTERM, window.sigterm_handler)
