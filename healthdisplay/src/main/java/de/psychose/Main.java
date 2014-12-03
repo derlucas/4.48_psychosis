@@ -1,10 +1,12 @@
 package de.psychose;
 
+import com.illposed.osc.OSCListener;
+import com.illposed.osc.OSCMessage;
+
 import javax.swing.*;
-import java.awt.event.WindowAdapter;
-import java.awt.event.WindowEvent;
 import java.net.SocketException;
 import java.net.UnknownHostException;
+import java.util.Date;
 
 /**
  * @author: lucas
@@ -12,48 +14,116 @@ import java.net.UnknownHostException;
  */
 public class Main {
 
-
     public static void main(String[] args) {
+        new Main();
+    }
 
-        final boolean showErrors = args.length > 0;
+    public Main() {
+        final ActorData[] actorDatas = new ActorData[3];
+        actorDatas[0] = new ActorData("merle", "Körper 1");
+        actorDatas[1] = new ActorData("uwe", "Körper 2");
+        actorDatas[2] = new ActorData("bjoern", "Körper 3");
 
-        try
-        {
-            //UIManager.setLookAndFeel( UIManager.getSystemLookAndFeelClassName() );
-            UIManager.setLookAndFeel( "com.sun.java.swing.plaf.gtk.GTKLookAndFeel" );
-        }
-        catch ( Exception e )
-        {
+        try {
+            UIManager.setLookAndFeel("com.sun.java.swing.plaf.gtk.GTKLookAndFeel");
+        } catch (Exception e) {
             e.printStackTrace();
         }
 
         try {
             final ChaOSCclient chaOSCclient = new ChaOSCclient("chaosc", 7110);
-            final SnmpStatClient snmp = new SnmpStatClient("switch/161");
-            final MainForm mainForm = new MainForm(showErrors, chaOSCclient, snmp);
-            final JFrame frame = new JFrame("MainForm");
-            frame.setContentPane(mainForm.getMainPanel());
-            frame.setResizable(false);
-            frame.setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE);
-            frame.pack();
 
-            frame.addWindowListener(new WindowAdapter() {
-                @Override
-                public void windowClosing(WindowEvent e) {
-                    chaOSCclient.stopReceiver();
-                    super.windowClosing(e);
-                }
-            });
-
-            frame.setVisible(true);
-
-            new Streamer(8888, mainForm.getMainPanel()).run();
+            for(int i = 0; i < actorDatas.length; i++) {
+                addActorOSCListeners(chaOSCclient, actorDatas[i]);
+            }
 
             chaOSCclient.startReceiver();
+
+            new ControlForm(chaOSCclient, actorDatas);
+            new MainForm(actorDatas);
+
+            Runtime.getRuntime().addShutdownHook(new Thread(new Runnable() {
+                @Override
+                public void run() {
+                    chaOSCclient.stopReceiver();
+                }
+            }));
 
         } catch (UnknownHostException | SocketException e) {
             e.printStackTrace();
         }
     }
 
+    private static void addActorOSCListeners(final ChaOSCclient chaOSCclient, final ActorData actorData) {
+
+        chaOSCclient.addListener("/" + actorData.getActor().toLowerCase() + "/heartbeat", new OSCListener() {
+            @Override
+            public void acceptMessage(Date time, OSCMessage message) {
+                if (message.getArguments().length == 3) {
+
+                    // set the beat ( 0 or 1 )
+                    if (message.getArguments()[0] instanceof Integer) {
+                        actorData.setHeartbeat( (int)(message.getArguments()[0]) == 1);
+                    }
+
+                    // set the heartrate
+                    if (message.getArguments()[1] instanceof Integer) {
+                        final int pulse = (int) (message.getArguments()[1]);
+                        if (pulse > 60) {      // try to skip the invalid pulse rate from device
+                            actorData.setPulse(pulse);
+                        }
+                    }
+
+                    // set the oxy level
+                    if (message.getArguments()[2] instanceof Integer) {
+                        actorData.setOxygen((int) (message.getArguments()[2]));
+                    }
+                }
+            }
+        });
+
+        chaOSCclient.addListener("/" + actorData.getActor().toLowerCase() + "/ekg", new OSCListener() {
+            @Override
+            public void acceptMessage(Date time, OSCMessage message) {
+                if (message.getArguments().length == 1 && message.getArguments()[0] instanceof Integer) {
+                    actorData.setEkg((int) (message.getArguments()[0]));
+                }
+            }
+        });
+
+        chaOSCclient.addListener("/" + actorData.getActor().toLowerCase() + "/emg", new OSCListener() {
+            @Override
+            public void acceptMessage(Date time, OSCMessage message) {
+                if (message.getArguments().length == 1 && message.getArguments()[0] instanceof Integer) {
+                    actorData.setEmg((int) (message.getArguments()[0]));
+                }
+            }
+        });
+
+        chaOSCclient.addListener("/" + actorData.getActor().toLowerCase() + "/temperature", new OSCListener() {
+            @Override
+            public void acceptMessage(Date time, OSCMessage message) {
+                if (message.getArguments().length == 1 && message.getArguments()[0] instanceof Float) {
+                    actorData.setTemperature((float) (message.getArguments()[0]));
+                }
+            }
+        });
+
+        chaOSCclient.addListener("/" + actorData.getActor().toLowerCase() + "/airFlow", new OSCListener() {
+            @Override
+            public void acceptMessage(Date time, OSCMessage message) {
+                if (message.getArguments().length == 1 && message.getArguments()[0] instanceof Integer) {
+                    actorData.setAirflow((int) (message.getArguments()[0]));
+                }
+            }
+        });
+
+        //TODO: evtl muss das oben hier noch anders
+        chaOSCclient.addListener("/" + actorData.getActor().toLowerCase() + "/tommyheartbeat", new OSCListener() {
+            @Override
+            public void acceptMessage(Date time, OSCMessage message) {
+                actorData.setTommyHeartbeat(!actorData.getTommyHeartbeat());
+            }
+        });
+    }
 }

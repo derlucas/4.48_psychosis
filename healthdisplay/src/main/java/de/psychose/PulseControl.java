@@ -14,63 +14,41 @@ import java.util.Random;
 public class PulseControl extends Observable {
     private final int PULSE_WOBBLE_WIDTH = 10;
     private JCheckBox enableCheckBox;
-    private JSpinner spinner1;
-    private JPanel pulsePanel;
-    private Timer timer;
-    private Random random = new Random();
-    private int heartbeat = 0;
-
+    private JSpinner spinner;
+    private JPanel mainPanel;
+    private final Timer timer;
+    private final Random random = new Random();
+    private boolean heartbeat = false;
 
     public PulseControl() {
-        enableCheckBox.setFocusable(false);
-        spinner1.setFocusable(false);
-        spinner1.setValue(110);
+        spinner.setValue(110);
 
-        timer = new Timer(100, new AbstractAction() {
+        timer = new Timer(500, new AbstractAction() {
             @Override
             public void actionPerformed(ActionEvent e) {
-                heartbeat = (heartbeat+1) % 2;
+                heartbeat = !heartbeat;
 
-                final int pulseWobbleCenter = (int)spinner1.getValue();
-                int pulse = pulseWobbleCenter - PULSE_WOBBLE_WIDTH / 2 + random.nextInt(PULSE_WOBBLE_WIDTH);
+                int pulse = (int) spinner.getValue() - PULSE_WOBBLE_WIDTH / 2 + random.nextInt(PULSE_WOBBLE_WIDTH);
 
                 if(pulse < 60) pulse = 60;
-                if(pulse > 180) pulse = 180;
+                if(pulse > 230) pulse = 230;
 
-                final PulseData data = new PulseData(heartbeat, pulse, 95 + random.nextInt(4));
                 setChanged();
-                notifyObservers(data);
+                notifyObservers(new PulseData(heartbeat, pulse, 95 + random.nextInt(4)));
 
-                final int delay = 60000 / pulse;
-                timer.setDelay(delay);
+                timer.setDelay(60000 / pulse);
             }
         });
-
-        timer.setRepeats(true);
 
         enableCheckBox.addItemListener(new ItemListener() {
             @Override
             public void itemStateChanged(ItemEvent e) {
-                System.out.println("item state changed");
-                JCheckBox checkBox = (JCheckBox)e.getSource();
-                if(checkBox.isSelected()) {
-                    if(!timer.isRunning()) {
-                        System.out.println("starting pulsecontrol " + this);
-                        timer.start();
-                    }
-                } else {
-                    if(timer.isRunning()) {
-                        System.out.println("stopping pulsecontrol " + this);
-                        timer.stop();
-                    }
+                if (enableCheckBox.isSelected() && !timer.isRunning()) {
+                    timer.start();
+                } else if (timer.isRunning()) {
+                    timer.stop();
                 }
-
             }
         });
     }
-
-    public void hide() {
-        this.pulsePanel.setVisible(false);
-    }
-
 }

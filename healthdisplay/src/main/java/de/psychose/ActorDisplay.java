@@ -2,19 +2,14 @@ package de.psychose;
 
 import javax.swing.*;
 import java.awt.*;
-import java.awt.event.ActionEvent;
+import java.text.DecimalFormat;
 
 /**
  * @author: lucas
  * @date: 14.04.14 21:44
  */
 public class ActorDisplay {
-    private final Timer timer;
-    private final static Color onColor = Color.WHITE;
-    private final static Color offColor = Color.RED;
-    private final static String offText = "no data";
-
-    private JPanel actorPanel;
+    private static final long TIMEOUT_MILLISECONDS = 2000;
     private JLabel lblCaption;
     private JLabel lblHeartbeat;
     private JLabel lblPulse;
@@ -23,116 +18,48 @@ public class ActorDisplay {
     private JLabel lblEmg;
     private JLabel lblTemperature;
     private JLabel lblBreath;
+    private JPanel mainPanel;
+    private ActorData actorData;
+    private boolean showErrors = false;
+    private DecimalFormat df = new DecimalFormat("#.0");
 
-    private int counterHeartbeat = 0;
-    private int counterPulse = 0;
-    private int counterOxy = 0;
-    private int counterEkg = 0;
-    private int counterEmg = 0;
-    private int counterTemperature = 0;
-    private int counterBreath = 0;
+    public void update() {
+        if (actorData == null) {
+            return;
+        }
 
-    private int timeout = 20;   // 20 * 100ms
+        lblBreath.setText(String.valueOf(actorData.getAirflow()));
+        lblTemperature.setText(df.format(actorData.getTemperature() + actorData.getTemperatureOffset()));
+        lblEkg.setText(String.valueOf(actorData.getEkg()));
+        lblPulse.setText(actorData.getHeartbeat() ? "systole" : "diastole");
+        lblEmg.setText(String.valueOf(actorData.getEmg()));
+        lblOxy.setText(String.valueOf(actorData.getOxygen()));
+        lblHeartbeat.setText(String.valueOf(actorData.getPulse()));
 
-    public void setCaption(String caption) {
-        lblCaption.setText(caption);
+        if (showErrors) {
+            checkTimeout(lblTemperature, actorData.getTimestampTemperature());
+            checkTimeout(lblPulse, actorData.getTimestampPulse());
+            checkTimeout(lblOxy, actorData.getTimestampPulse());
+            checkTimeout(lblHeartbeat, actorData.getTimestampPulse());
+            checkTimeout(lblEkg, actorData.getTimestampEkg());
+            checkTimeout(lblEmg, actorData.getTimestampEmg());
+            checkTimeout(lblBreath, actorData.getTimestampBreath());
+        }
     }
 
-    public void setBreath(String breath) {
-        lblBreath.setText(breath);
-        counterBreath = 0;
+    public void init(ActorData actorData, final boolean showErrors) {
+        this.actorData = actorData;
+        lblCaption.setText(actorData.getCaption());
+        this.showErrors = showErrors;
     }
 
-    public void setTemperature(String temperature) {
-        lblTemperature.setText(temperature);
-        counterTemperature = 0;
-    }
-
-    public void setEkg(String value) {
-        lblEkg.setText(value);
-        counterEkg = 0;
-    }
-
-    public void setPulse(String pulse) {
-        lblPulse.setText(pulse);
-        counterPulse = 0;
-    }
-
-    public void setEmg(String emg) {
-        lblEmg.setText(emg);
-        counterEmg = 0;
-    }
-
-    public void setOxy(String oxy) {
-        lblOxy.setText(oxy);
-        counterOxy = 0;
-    }
-
-    public void setHeartbeat(String heartbeat) {
-        lblHeartbeat.setText(heartbeat);
-        counterHeartbeat = 0;
-    }
-
-    public ActorDisplay() {
-        this.timer = new Timer(100, new AbstractAction() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-
-                if (++counterTemperature > timeout) {
-                    lblTemperature.setForeground(offColor);
-                    lblTemperature.setText(offText);
-                } else {
-                    lblTemperature.setForeground(onColor);
-                }
-
-                if (++counterPulse > timeout) {
-                    lblPulse.setForeground(offColor);
-                    lblPulse.setText(offText);
-                } else {
-                    lblPulse.setForeground(onColor);
-                }
-
-                if (++counterOxy > timeout) {
-                    lblOxy.setForeground(offColor);
-                    lblOxy.setText(offText);
-                } else {
-                    lblOxy.setForeground(onColor);
-                }
-
-                if (++counterEkg > timeout) {
-                    lblEkg.setForeground(offColor);
-                    lblEkg.setText(offText);
-                } else {
-                    lblEkg.setForeground(onColor);
-                }
-
-                if (++counterEmg > timeout) {
-                    lblEmg.setForeground(offColor);
-                    lblEmg.setText(offText);
-                } else {
-                    lblEmg.setForeground(onColor);
-                }
-
-                if (++counterHeartbeat > timeout) {
-                    lblHeartbeat.setForeground(offColor);
-                    lblHeartbeat.setText(offText);
-                } else {
-                    lblHeartbeat.setForeground(onColor);
-                }
-
-                if (++counterBreath > timeout) {
-                    lblBreath.setForeground(offColor);
-                    lblBreath.setText(offText);
-                } else {
-                    lblBreath.setForeground(onColor);
-                }
-            }
-        });
-        this.timer.setRepeats(true);
-    }
-
-    public void startErrorTimer() {
-        this.timer.start();
+    private void checkTimeout(final JLabel label, final long time) {
+        if (time < System.currentTimeMillis() - TIMEOUT_MILLISECONDS) {
+            label.setText("no data");
+            label.setForeground(Color.red);
+        } else {
+            label.setForeground(Color.white);
+        }
     }
 
 }

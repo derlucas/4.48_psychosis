@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<form xmlns="http://www.intellij.com/uidesigner/form/" version="1" bind-to-class="de.psychose.ActorHeart">
+  <grid id="27dc6" binding="mainPanel" layout-manager="BorderLayout" hgap="0" vgap="0">
+    <constraints>
+      <xy x="20" y="20" width="789" height="299"/>
+    </constraints>
+    <properties>
+      <background color="-16777216"/>
+      <enabled value="true"/>
+      <focusable value="false"/>
+      <maximumSize width="789" height="299"/>
+      <minimumSize width="789" height="299"/>
+      <preferredSize width="789" height="299"/>
+    </properties>
+    <border type="none"/>
+    <children/>
+  </grid>
+</form>

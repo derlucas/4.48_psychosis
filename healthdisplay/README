@@ -1,5 +1,10 @@
+you need jdk 1.7 or newer and maven2 installed
 
 
 compile with
 
 mvn clean compile ideauidesigner:javac2  assembly:single
+
+run with
+
+java -jar psychose-X.X-jar-with-dependencies.jar

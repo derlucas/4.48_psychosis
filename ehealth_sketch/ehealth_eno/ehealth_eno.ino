@@ -59,14 +59,14 @@ float getTemperature(void)
 
 void loop() {
   zaehler++;
-  int airFlow = analogRead(A1);
-  int emg = analogRead(0);
-  int temp = getTemperature();
-  Serial.print(airFlow);
+//  int airFlow = analogRead(A1);
+//  int emg = analogRead(0);
+//  int temp = getTemperature();
+  Serial.print(analogRead(A1));
   Serial.print(";");
-  Serial.print(emg);
+  Serial.print(analogRead(0));
   Serial.print(";");
-  Serial.println(temp);
+  Serial.println(getTemperature());
   delay(100);
   
   if(zaehler >= 10) {

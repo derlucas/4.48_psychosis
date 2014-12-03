@@ -73,7 +73,7 @@ class EHealth2OSC(Forwarder):
         osc_message = OSCMessage("/%s/emg" % self.actor)
         osc_message.appendTypedArg(emg, "i")
         osc_sock.sendall(osc_message.encode_osc())
-        osc_message = OSCMessage("/%s/temperatur" % self.actor)
+        osc_message = OSCMessage("/%s/temperature" % self.actor)
         osc_message.appendTypedArg(temp, "i")
         osc_sock.sendall(osc_message.encode_osc())
 
