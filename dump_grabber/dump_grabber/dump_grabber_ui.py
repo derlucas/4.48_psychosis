@@ -2,8 +2,8 @@
 
 # Form implementation generated from reading ui file 'dump_grabber.ui'
 #
-# Created: Tue May 13 06:55:09 2014
-#      by: PyQt4 UI code generator 4.10.3
+# Created: Wed Dec  3 17:45:11 2014
+#      by: PyQt4 UI code generator 4.10.4
 #
 # WARNING! All changes made in this file will be lost!
 
@@ -187,5 +187,5 @@ class Ui_MainWindow(object):
         QtCore.QMetaObject.connectSlotsByName(MainWindow)
 
     def retranslateUi(self, MainWindow):
-        MainWindow.setWindowTitle(_translate("MainWindow", "MainWindow", None))
+        MainWindow.setWindowTitle(_translate("MainWindow", "DumpGrabberMain", None))
 
