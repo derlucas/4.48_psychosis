@@ -20,33 +20,26 @@
 
 from __future__ import absolute_import
 
-import random
 import os.path
 import re
-import signal
-import sys
-import exceptions
 
 from PyQt4 import QtCore, QtGui
-from PyQt4.QtGui import QImage, QPixmap, QMainWindow
-from PyQt4.QtCore import QBuffer, QIODevice
-
+from PyQt4.QtGui import QPixmap, QMainWindow
+from PyQt4.QtCore import QIODevice, QBuffer, QByteArray
+from PyQt4.QtNetwork import QUdpSocket, QHostAddress
 import numpy as np
-
 import pyqtgraph as pg
 from pyqtgraph.widgets.PlotWidget import PlotWidget
 from pyqtgraph.graphicsItems.PlotCurveItem import PlotCurveItem
 from pyqtgraph.graphicsItems.ScatterPlotItem import ScatterPlotItem
-
 from chaosc.argparser_groups import ArgParser
 from chaosc.lib import logger, resolve_host
-from psylib.mjpeg_streaming_server import *
-from psylib.psyqt_base import PsyQtChaoscClientBase
+
 
 try:
-    from chaosc.c_osc_lib import decode_osc
+    from chaosc.c_osc_lib import OSCMessage, decode_osc
 except ImportError as e:
-    from chaosc.osc_lib import decode_osc
+    from chaosc.osc_lib import OSCMessage, decode_osc
 
 qtapp = QtGui.QApplication([])
 
@@ -57,48 +50,6 @@ def get_steps(pulse, delta_ms):
     used_sleep_time = beat_length / steps_pre
     steps = int(beat_length / used_sleep_time)
     return steps, used_sleep_time
-
-
-class Generator(object):
-    def __init__(self, pulse=92, delta=80):
-        self.count = 0
-        self.pulse = random.randint(85, 105)
-        self.delta = delta
-        self.finished = False
-        self.steps, _ = get_steps(self.pulse, delta / 4)
-
-    def __call__(self):
-        while 1:
-            if self.count < int(self.steps / 100. * 30):
-                value = random.randint(30, 35)
-            elif self.count == int(self.steps / 100. * 30):
-                value = random.randint(55, 66)
-            elif self.count < int(self.steps / 100. * 45):
-                value = random.randint(30, 35)
-            elif self.count < int(self.steps / 2.):
-                value = random.randint(0, 15)
-            elif self.count == int(self.steps / 2.):
-                value = 255
-            elif self.count < int(self.steps / 100. * 60):
-                value = random.randint(25, 35)
-            elif self.count < int(self.steps / 100. * 70):
-                value = random.randint(10, 30)
-            elif self.count < self.steps:
-                value = random.randint(15, 30)
-            else:
-                self.finished = True
-                self.count = 0
-                value = 30
-
-            self.count += 1
-            yield value
-
-    def set_pulse(self, pulse):
-        self.pulse = pulse
-        self.steps, _ = get_steps(pulse, self.delta)
-
-    def retrigger(self):
-        self.count = self.steps / 2
 
 
 class Actor(object):
@@ -115,8 +66,6 @@ class Actor(object):
         self.pre_head = 0
         self.plotItem = PlotCurveItem(pen=pg.mkPen(color, width=3), width=4, name=name)
         self.plotPoint = ScatterPlotItem(pen=pg.mkPen("w", width=5), brush=pg.mkBrush(color), size=5)
-        self.osci = None
-        self.osci_obj = None
         self.render()
 
     def __str__(self):
@@ -124,7 +73,7 @@ class Actor(object):
 
     def __repr__(self):
         return "Actor(%r, %r, %r, %r, %r, %r)" % (self.name, self.num_data,
-            self.color, self.ix, self.max_actors, self.actor_height)
+                                                  self.color, self.ix, self.max_actors, self.actor_height)
 
     def add_value(self, value):
         self.pre_head = self.head
@@ -144,25 +93,23 @@ class Actor(object):
         self.plotItem.setData(y=self.data, clear=True)
         self.plotPoint.setData(x=[self.pre_head], y=[self.data[self.pre_head]])
 
-class PlotWindow(PlotWidget):
-    def __init__(self, title=None, **kargs):
-        self.win = QtGui.QMainWindow()
-        self.win.resize(768, 576)
-        PlotWidget.__init__(self, **kargs)
-        self.win.setCentralWidget(self)
-        for m in ['resize']:
-            setattr(self, m, getattr(self.win, m))
-        if title is not None:
-            self.win.setWindowTitle(title)
-        self.win.show()
 
-
-class EkgPlotWidget(QMainWindow, PsyQtChaoscClientBase, MjpegStreamingConsumerInterface):
+class EkgPlotWidget(QMainWindow):
     def __init__(self, args, parent=None):
         self.args = args
-        super(EkgPlotWidget, self).__init__()
-        PsyQtChaoscClientBase.__init__(self)
-        self.plot_widget = PlotWidget(title="Psychose - EkgPlotter")
+        QMainWindow.__init__(self, parent)
+        self.mcount = 0
+
+        self.osc_sock = QUdpSocket(self)
+        logger.info("osc bind localhost %d", self.args.client_port)
+        self.osc_sock.bind(QHostAddress(self.args.client_host), self.args.client_port)
+        self.osc_sock.readyRead.connect(self.got_message)
+        self.osc_sock.error.connect(self.handle_osc_error)
+        self.subscribe()
+
+        self.plot_widget = PlotWidget()
+        self.setCentralWidget(self.plot_widget)
+        self.resize(args.client_width, args.client_height)
         colors = ["r", "g", "b"]
         self.active_actors = list()
         self.actors = dict()
@@ -171,13 +118,11 @@ class EkgPlotWidget(QMainWindow, PsyQtChaoscClientBase, MjpegStreamingConsumerIn
         self.max_actors = len(actor_names)
         self.actor_height = self.max_value / self.max_actors
         self.fps = 12.5
-        self.http_server = MjpegStreamingServer((args.http_host, args.http_port), self, self.fps)
-        self.http_server.listen(port=args.http_port)
-        self.num_data = 100
+        self.num_data = 640
         self.plot_widget.showGrid(False, False)
         self.plot_widget.setYRange(0, 255)
         self.plot_widget.setXRange(0, self.num_data)
-        self.plot_widget.resize(768, 576)
+        self.plot_widget.resize(args.client_width, args.client_height)
 
         bottom_axis = self.plot_widget.getAxis("bottom")
         left_axis = self.plot_widget.getAxis("left")
@@ -190,7 +135,41 @@ class EkgPlotWidget(QMainWindow, PsyQtChaoscClientBase, MjpegStreamingConsumerIn
             self.add_actor(actor_name, self.num_data, color, ix, self.max_actors, self.actor_height)
 
         self.set_positions()
+        self.ekg_regex = re.compile("^/(.*?)/ekg$")
         self.heartbeat_regex = re.compile("^/(.*?)/heartbeat$")
+
+        self.timer = QtCore.QTimer()
+        self.timer.timeout.connect(self.render_image)
+        self.timer.start(50)
+
+
+    def subscribe(self):
+        logger.info("subscribe")
+        msg = OSCMessage("/subscribe")
+        msg.appendTypedArg(self.args.client_host, "s")
+        msg.appendTypedArg(self.args.client_port, "i")
+        msg.appendTypedArg(self.args.authenticate, "s")
+        if self.args.subscriber_label is not None:
+            msg.appendTypedArg(self.args.subscriber_label, "s")
+        self.osc_sock.writeDatagram(QByteArray(msg.encode_osc()), QHostAddress(self.args.chaosc_host),
+                                    self.args.chaosc_port)
+
+    def unsubscribe(self):
+        logger.info("unsubscribe")
+        msg = OSCMessage("/unsubscribe")
+        msg.appendTypedArg(self.args.client_host, "s")
+        msg.appendTypedArg(self.args.client_port, "i")
+        msg.appendTypedArg(self.args.authenticate, "s")
+        self.osc_sock.writeDatagram(QByteArray(msg.encode_osc()), QHostAddress(self.args.chaosc_host),
+                                    self.args.chaosc_port)
+
+    def handle_osc_error(self, error):
+        logger.info("osc socket error %d", error)
+
+    def closeEvent(self, event):
+        logger.info("closeEvent %r", event)
+        self.unsubscribe()
+        event.accept()
 
     def pubdir(self):
         return os.path.dirname(os.path.abspath(__file__))
@@ -201,8 +180,6 @@ class EkgPlotWidget(QMainWindow, PsyQtChaoscClientBase, MjpegStreamingConsumerIn
         self.plot_widget.addItem(actor_obj.plotItem)
         self.plot_widget.addItem(actor_obj.plotPoint)
         self.active_actors.append(actor_obj)
-        actor_obj.osci_obj = Generator(pulse=random.randint(88, 104), delta=self.http_server.timer_delta)
-        actor_obj.osci = actor_obj.osci_obj()
 
     def set_positions(self):
         for ix, actor_obj in enumerate(self.active_actors):
@@ -213,68 +190,54 @@ class EkgPlotWidget(QMainWindow, PsyQtChaoscClientBase, MjpegStreamingConsumerIn
         return self.max_actors
 
     def update(self, osc_address, args):
-        res = self.heartbeat_regex.match(osc_address)
+        res = self.ekg_regex.match(osc_address)
         if res:
+            self.mcount += 1
             actor_name = res.group(1)
             actor_obj = self.actors[actor_name]
-            #logger.info("actor: %r, %r", actor_name, args)
-            if args[0] == 1:
-                actor_obj.osci_obj.retrigger()
-            actor_obj.osci_obj.set_pulse(args[1])
+            actor_obj.add_value(args[0])
+            # logger.info("actor: %r, %r", actor_name, args)
 
     def render_image(self):
         for actor_obj in self.active_actors:
             actor_obj.add_value(actor_obj.osci.next())
-            actor_obj.add_value(actor_obj.osci.next())
-            actor_obj.add_value(actor_obj.osci.next())
-            actor_obj.add_value(actor_obj.osci.next())
             actor_obj.render()
-        image = QPixmap(768, 576)
-        image.fill(QtCore.Qt.white)
-        painter = QtGui.QPainter(image)
-        painter.setRenderHints(QtGui.QPainter.RenderHint(
-            QtGui.QPainter.Antialiasing | QtGui.QPainter.TextAntialiasing),
-            True)
-        scene = self.plot_widget.plotItem.scene()
-        scene.render(painter, QtCore.QRectF(0, 0, 768, 576), QtCore.QRectF(0, 0, 768, 576))
-        painter.end()
-        buf = QBuffer()
-        buf.open(QIODevice.WriteOnly)
-        image.save(buf, "JPG", 80)
-        JpegData = buf.data()
-        return JpegData
+
+    @QtCore.pyqtSlot()
+    def render_image(self):
+        for actor_obj in self.active_actors:
+            actor_obj.render()
+        print self.mcount
 
     def got_message(self):
         while self.osc_sock.hasPendingDatagrams():
             data, address, port = self.osc_sock.readDatagram(self.osc_sock.pendingDatagramSize())
             try:
                 osc_address, typetags, args = decode_osc(data, 0, len(data))
+                self.update(osc_address, args)
             except ValueError, error:
                 logger.exception(error)
-            else:
-                self.update(osc_address, args)
 
 
 def main():
     arg_parser = ArgParser("ekgplotter")
     arg_parser.add_global_group()
-    client_group = arg_parser.add_client_group()
-    arg_parser.add_argument(client_group, '-x', "--http_host", default='::',
-                            help='my host, defaults to "::"')
-    arg_parser.add_argument(client_group, '-X', '--http_port', default=9000,
-                            type=int, help='my port, defaults to 9000')
     arg_parser.add_chaosc_group()
     arg_parser.add_subscriber_group()
+    client_group = arg_parser.add_client_group()
+    arg_parser.add_argument(client_group, '-W', "--client_width", type=int, default=640,
+                      help='my host, defaults to "::"')
+    arg_parser.add_argument(client_group, '-B', "--client_height", type=int, default=480,
+                      help='my port, defaults to 8000')
     args = arg_parser.finalize()
 
-    args.http_host, args.http_port = resolve_host(args.http_host, args.http_port, args.address_family)
     args.chaosc_host, args.chaosc_port = resolve_host(args.chaosc_host, args.chaosc_port, args.address_family)
 
     window = EkgPlotWidget(args)
     logger.info("foooooooo")
-    window.hide()
-    #sys.excepthook = window.sigint_handler
-    #signal.signal(signal.SIGTERM, window.sigterm_handler)
+    window.show()
+    # sys.excepthook = window.sigint_handler
+    # signal.signal(signal.SIGTERM, window.sigterm_handler)
     qtapp.exec_()
 
 
