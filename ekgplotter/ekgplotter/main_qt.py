@@ -235,6 +235,7 @@ def main():
 
     window = EkgPlotWidget(args)
     logger.info("foooooooo")
+    window.setWindowTitle("EKGPlotterMain")
     window.show()
     # sys.excepthook = window.sigint_handler
     # signal.signal(signal.SIGTERM, window.sigterm_handler)
