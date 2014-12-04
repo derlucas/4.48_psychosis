@@ -23,28 +23,40 @@ from __future__ import absolute_import
 import os
 import os.path
 import re
+from collections import deque
+import traceback
+
 import signal
 import sys
-from collections import deque
-
 from chaosc.argparser_groups import ArgParser
-from chaosc.lib import logger, resolve_host
+from chaosc.lib import logger
 from PyQt4 import QtCore, QtGui
-from PyQt4.QtCore import QBuffer, QByteArray, QIODevice
-from PyQt4.QtGui import QPixmap, QPainter
-from PyQt4.QtNetwork import QHostAddress
+from PyQt4.QtCore import QByteArray
+from PyQt4.QtNetwork import QUdpSocket, QHostAddress
 
-from dump_grabber.dump_grabber_ui import Ui_MainWindow
-from psylib.mjpeg_streaming_server import (MjpegStreamingServer,
-                                           MjpegStreamingConsumerInterface)
-from psylib.psyqt_base import PsyQtChaoscClientBase
 
 try:
     from chaosc.c_osc_lib import OSCMessage, decode_osc
 except ImportError:
     from chaosc.osc_lib import OSCMessage, decode_osc
 
+try:
+    _fromUtf8 = QtCore.QString.fromUtf8
+except AttributeError:
+    def _fromUtf8(s):
+        return s
+
+try:
+    _encoding = QtGui.QApplication.UnicodeUTF8
+
+    def _translate(context, text, disambig):
+        return QtGui.QApplication.translate(context, text, disambig, _encoding)
+except AttributeError:
+    def _translate(context, text, disambig):
+        return QtGui.QApplication.translate(context, text, disambig)
+
 QTAPP = QtGui.QApplication([])
+
 
 class ExclusiveTextStorage(object):
     """Stores the text representation of per actor osc messages"""
@@ -89,16 +101,168 @@ class ExclusiveTextStorage(object):
         self.data.append((column, text))
 
 
-class MainWindow(QtGui.QMainWindow, Ui_MainWindow, PsyQtChaoscClientBase):
-
+class MainWindow(QtGui.QMainWindow):
     """This app receives per actor osc messages and provides an mjpeg stream
     with colored text representation arranged in columns"""
 
     def __init__(self, args, parent=None):
         self.args = args
-        super(MainWindow, self).__init__()
-        self.setupUi(self)
-        
+        QtGui.QMainWindow.__init__(self, parent)
+
+        self.osc_sock = QUdpSocket(self)
+        logger.info("osc bind localhost %d", self.args.client_port)
+        self.osc_sock.bind(QHostAddress(self.args.client_host), self.args.client_port)
+        self.osc_sock.readyRead.connect(self.got_message)
+        self.osc_sock.error.connect(self.handle_osc_error)
+        self.subscribe()
+
+        self.graphics_view = QtGui.QGraphicsView(self)
+        self.resize(640, 480)
+        font = QtGui.QFont()
+        font.setFamily(_fromUtf8("Monospace"))
+        font.setPointSize(12)
+        font.setItalic(True)
+        self.setFont(font)
+        palette = QtGui.QPalette()
+        brush = QtGui.QBrush(QtGui.QColor(255, 255, 255))
+        brush.setStyle(QtCore.Qt.SolidPattern)
+        palette.setBrush(QtGui.QPalette.Active, QtGui.QPalette.WindowText, brush)
+        brush = QtGui.QBrush(QtGui.QColor(0, 0, 0))
+        brush.setStyle(QtCore.Qt.SolidPattern)
+        palette.setBrush(QtGui.QPalette.Active, QtGui.QPalette.Button, brush)
+        brush = QtGui.QBrush(QtGui.QColor(0, 0, 0))
+        brush.setStyle(QtCore.Qt.SolidPattern)
+        palette.setBrush(QtGui.QPalette.Active, QtGui.QPalette.Light, brush)
+        brush = QtGui.QBrush(QtGui.QColor(0, 0, 0))
+        brush.setStyle(QtCore.Qt.SolidPattern)
+        palette.setBrush(QtGui.QPalette.Active, QtGui.QPalette.Midlight, brush)
+        brush = QtGui.QBrush(QtGui.QColor(0, 0, 0))
+        brush.setStyle(QtCore.Qt.SolidPattern)
+        palette.setBrush(QtGui.QPalette.Active, QtGui.QPalette.Dark, brush)
+        brush = QtGui.QBrush(QtGui.QColor(0, 0, 0))
+        brush.setStyle(QtCore.Qt.SolidPattern)
+        palette.setBrush(QtGui.QPalette.Active, QtGui.QPalette.Mid, brush)
+        brush = QtGui.QBrush(QtGui.QColor(255, 255, 255))
+        brush.setStyle(QtCore.Qt.SolidPattern)
+        palette.setBrush(QtGui.QPalette.Active, QtGui.QPalette.Text, brush)
+        brush = QtGui.QBrush(QtGui.QColor(255, 255, 255))
+        brush.setStyle(QtCore.Qt.SolidPattern)
+        palette.setBrush(QtGui.QPalette.Active, QtGui.QPalette.BrightText, brush)
+        brush = QtGui.QBrush(QtGui.QColor(255, 255, 255))
+        brush.setStyle(QtCore.Qt.SolidPattern)
+        palette.setBrush(QtGui.QPalette.Active, QtGui.QPalette.ButtonText, brush)
+        brush = QtGui.QBrush(QtGui.QColor(0, 0, 0))
+        brush.setStyle(QtCore.Qt.SolidPattern)
+        palette.setBrush(QtGui.QPalette.Active, QtGui.QPalette.Base, brush)
+        brush = QtGui.QBrush(QtGui.QColor(0, 0, 0))
+        brush.setStyle(QtCore.Qt.SolidPattern)
+        palette.setBrush(QtGui.QPalette.Active, QtGui.QPalette.Window, brush)
+        brush = QtGui.QBrush(QtGui.QColor(0, 0, 0))
+        brush.setStyle(QtCore.Qt.SolidPattern)
+        palette.setBrush(QtGui.QPalette.Active, QtGui.QPalette.Shadow, brush)
+        brush = QtGui.QBrush(QtGui.QColor(0, 0, 0))
+        brush.setStyle(QtCore.Qt.SolidPattern)
+        palette.setBrush(QtGui.QPalette.Active, QtGui.QPalette.AlternateBase, brush)
+        brush = QtGui.QBrush(QtGui.QColor(255, 255, 220))
+        brush.setStyle(QtCore.Qt.SolidPattern)
+        palette.setBrush(QtGui.QPalette.Active, QtGui.QPalette.ToolTipBase, brush)
+        brush = QtGui.QBrush(QtGui.QColor(0, 0, 0))
+        brush.setStyle(QtCore.Qt.SolidPattern)
+        palette.setBrush(QtGui.QPalette.Active, QtGui.QPalette.ToolTipText, brush)
+        brush = QtGui.QBrush(QtGui.QColor(255, 255, 255))
+        brush.setStyle(QtCore.Qt.SolidPattern)
+        palette.setBrush(QtGui.QPalette.Inactive, QtGui.QPalette.WindowText, brush)
+        brush = QtGui.QBrush(QtGui.QColor(0, 0, 0))
+        brush.setStyle(QtCore.Qt.SolidPattern)
+        palette.setBrush(QtGui.QPalette.Inactive, QtGui.QPalette.Button, brush)
+        brush = QtGui.QBrush(QtGui.QColor(0, 0, 0))
+        brush.setStyle(QtCore.Qt.SolidPattern)
+        palette.setBrush(QtGui.QPalette.Inactive, QtGui.QPalette.Light, brush)
+        brush = QtGui.QBrush(QtGui.QColor(0, 0, 0))
+        brush.setStyle(QtCore.Qt.SolidPattern)
+        palette.setBrush(QtGui.QPalette.Inactive, QtGui.QPalette.Midlight, brush)
+        brush = QtGui.QBrush(QtGui.QColor(0, 0, 0))
+        brush.setStyle(QtCore.Qt.SolidPattern)
+        palette.setBrush(QtGui.QPalette.Inactive, QtGui.QPalette.Dark, brush)
+        brush = QtGui.QBrush(QtGui.QColor(0, 0, 0))
+        brush.setStyle(QtCore.Qt.SolidPattern)
+        palette.setBrush(QtGui.QPalette.Inactive, QtGui.QPalette.Mid, brush)
+        brush = QtGui.QBrush(QtGui.QColor(255, 255, 255))
+        brush.setStyle(QtCore.Qt.SolidPattern)
+        palette.setBrush(QtGui.QPalette.Inactive, QtGui.QPalette.Text, brush)
+        brush = QtGui.QBrush(QtGui.QColor(255, 255, 255))
+        brush.setStyle(QtCore.Qt.SolidPattern)
+        palette.setBrush(QtGui.QPalette.Inactive, QtGui.QPalette.BrightText, brush)
+        brush = QtGui.QBrush(QtGui.QColor(255, 255, 255))
+        brush.setStyle(QtCore.Qt.SolidPattern)
+        palette.setBrush(QtGui.QPalette.Inactive, QtGui.QPalette.ButtonText, brush)
+        brush = QtGui.QBrush(QtGui.QColor(0, 0, 0))
+        brush.setStyle(QtCore.Qt.SolidPattern)
+        palette.setBrush(QtGui.QPalette.Inactive, QtGui.QPalette.Base, brush)
+        brush = QtGui.QBrush(QtGui.QColor(0, 0, 0))
+        brush.setStyle(QtCore.Qt.SolidPattern)
+        palette.setBrush(QtGui.QPalette.Inactive, QtGui.QPalette.Window, brush)
+        brush = QtGui.QBrush(QtGui.QColor(0, 0, 0))
+        brush.setStyle(QtCore.Qt.SolidPattern)
+        palette.setBrush(QtGui.QPalette.Inactive, QtGui.QPalette.Shadow, brush)
+        brush = QtGui.QBrush(QtGui.QColor(0, 0, 0))
+        brush.setStyle(QtCore.Qt.SolidPattern)
+        palette.setBrush(QtGui.QPalette.Inactive, QtGui.QPalette.AlternateBase, brush)
+        brush = QtGui.QBrush(QtGui.QColor(255, 255, 220))
+        brush.setStyle(QtCore.Qt.SolidPattern)
+        palette.setBrush(QtGui.QPalette.Inactive, QtGui.QPalette.ToolTipBase, brush)
+        brush = QtGui.QBrush(QtGui.QColor(0, 0, 0))
+        brush.setStyle(QtCore.Qt.SolidPattern)
+        palette.setBrush(QtGui.QPalette.Inactive, QtGui.QPalette.ToolTipText, brush)
+        brush = QtGui.QBrush(QtGui.QColor(0, 0, 0))
+        brush.setStyle(QtCore.Qt.SolidPattern)
+        palette.setBrush(QtGui.QPalette.Disabled, QtGui.QPalette.WindowText, brush)
+        brush = QtGui.QBrush(QtGui.QColor(0, 0, 0))
+        brush.setStyle(QtCore.Qt.SolidPattern)
+        palette.setBrush(QtGui.QPalette.Disabled, QtGui.QPalette.Button, brush)
+        brush = QtGui.QBrush(QtGui.QColor(0, 0, 0))
+        brush.setStyle(QtCore.Qt.SolidPattern)
+        palette.setBrush(QtGui.QPalette.Disabled, QtGui.QPalette.Light, brush)
+        brush = QtGui.QBrush(QtGui.QColor(0, 0, 0))
+        brush.setStyle(QtCore.Qt.SolidPattern)
+        palette.setBrush(QtGui.QPalette.Disabled, QtGui.QPalette.Midlight, brush)
+        brush = QtGui.QBrush(QtGui.QColor(0, 0, 0))
+        brush.setStyle(QtCore.Qt.SolidPattern)
+        palette.setBrush(QtGui.QPalette.Disabled, QtGui.QPalette.Dark, brush)
+        brush = QtGui.QBrush(QtGui.QColor(0, 0, 0))
+        brush.setStyle(QtCore.Qt.SolidPattern)
+        palette.setBrush(QtGui.QPalette.Disabled, QtGui.QPalette.Mid, brush)
+        brush = QtGui.QBrush(QtGui.QColor(0, 0, 0))
+        brush.setStyle(QtCore.Qt.SolidPattern)
+        palette.setBrush(QtGui.QPalette.Disabled, QtGui.QPalette.Text, brush)
+        brush = QtGui.QBrush(QtGui.QColor(255, 255, 255))
+        brush.setStyle(QtCore.Qt.SolidPattern)
+        palette.setBrush(QtGui.QPalette.Disabled, QtGui.QPalette.BrightText, brush)
+        brush = QtGui.QBrush(QtGui.QColor(0, 0, 0))
+        brush.setStyle(QtCore.Qt.SolidPattern)
+        palette.setBrush(QtGui.QPalette.Disabled, QtGui.QPalette.ButtonText, brush)
+        brush = QtGui.QBrush(QtGui.QColor(0, 0, 0))
+        brush.setStyle(QtCore.Qt.SolidPattern)
+        palette.setBrush(QtGui.QPalette.Disabled, QtGui.QPalette.Base, brush)
+        brush = QtGui.QBrush(QtGui.QColor(0, 0, 0))
+        brush.setStyle(QtCore.Qt.SolidPattern)
+        palette.setBrush(QtGui.QPalette.Disabled, QtGui.QPalette.Window, brush)
+        brush = QtGui.QBrush(QtGui.QColor(0, 0, 0))
+        brush.setStyle(QtCore.Qt.SolidPattern)
+        palette.setBrush(QtGui.QPalette.Disabled, QtGui.QPalette.Shadow, brush)
+        brush = QtGui.QBrush(QtGui.QColor(0, 0, 0))
+        brush.setStyle(QtCore.Qt.SolidPattern)
+        palette.setBrush(QtGui.QPalette.Disabled, QtGui.QPalette.AlternateBase, brush)
+        brush = QtGui.QBrush(QtGui.QColor(255, 255, 220))
+        brush.setStyle(QtCore.Qt.SolidPattern)
+        palette.setBrush(QtGui.QPalette.Disabled, QtGui.QPalette.ToolTipBase, brush)
+        brush = QtGui.QBrush(QtGui.QColor(0, 0, 0))
+        brush.setStyle(QtCore.Qt.SolidPattern)
+        palette.setBrush(QtGui.QPalette.Disabled, QtGui.QPalette.ToolTipText, brush)
+        self.graphics_view.setPalette(palette)
+        self.graphics_view.setAutoFillBackground(False)
+        self.graphics_view.setObjectName(_fromUtf8("graphics_view"))
+        self.setCentralWidget(self.graphics_view)
         self.graphics_view.setHorizontalScrollBarPolicy(
             QtCore.Qt.ScrollBarAlwaysOff)
         self.graphics_view.setVerticalScrollBarPolicy(
@@ -114,6 +278,7 @@ class MainWindow(QtGui.QMainWindow, Ui_MainWindow, PsyQtChaoscClientBase):
         self.graphics_scene.setFont(self.default_font)
         self.font_metrics = QtGui.QFontMetrics(self.default_font)
         self.line_height = self.font_metrics.height()
+        self.setWindowTitle(_translate("MainWindow", "DumpGrabberMain", None))
         columns = 3
         self.column_width = 640 / columns
         self.text_storage = ExclusiveTextStorage(columns, self.default_font,
@@ -127,24 +292,63 @@ class MainWindow(QtGui.QMainWindow, Ui_MainWindow, PsyQtChaoscClientBase):
         self.timer.timeout.connect(self.render_image)
         self.timer.start(100)
 
-    def pubdir(self):
-        return os.path.dirname(os.path.abspath(__file__))
+    def sigint_handler(self, ex_cls, ex, tb):
+        """Handler for the SIGINT signal."""
+        logger.info("sigint_handler")
+        if ex_cls == KeyboardInterrupt:
+            logger.info("found KeyboardInterrupt")
+            self.unsubscribe()
+            QtGui.QApplication.exit()
+        else:
+            logger.critical(''.join(traceback.format_tb(tb)))
+            logger.critical('{0}: {1}'.format(ex_cls, ex))
 
-    def closeEvent(self, event):
+    def sigterm_handler(self, *args):
+        logger.info("sigterm_handler")
         self.unsubscribe()
+        QtGui.QApplication.exit()
+
+    def subscribe(self):
+        logger.info("subscribe")
+        msg = OSCMessage("/subscribe")
+        logger.info(self.args.client_host)
+        msg.appendTypedArg(self.args.client_host, "s")
+        msg.appendTypedArg(self.args.client_port, "i")
+        msg.appendTypedArg(self.args.authenticate, "s")
+        if self.args.subscriber_label is not None:
+            msg.appendTypedArg(self.args.subscriber_label, "s")
+        self.osc_sock.writeDatagram(QByteArray(msg.encode_osc()), QHostAddress(self.args.chaosc_host),
+                                    self.args.chaosc_port)
+
+    def unsubscribe(self):
+        logger.info("unsubscribe")
+        msg = OSCMessage("/unsubscribe")
+        msg.appendTypedArg(self.args.client_host, "s")
+        msg.appendTypedArg(self.args.client_port, "i")
+        msg.appendTypedArg(self.args.authenticate, "s")
+        self.osc_sock.writeDatagram(QByteArray(msg.encode_osc()), QHostAddress(self.args.chaosc_host),
+                                    self.args.chaosc_port)
 
     def handle_osc_error(self, error):
         logger.info("osc socket error %d", error)
+
+    def closeEvent(self, event):
+        logger.info("closeEvent %r", event)
+        self.unsubscribe()
+        event.accept()
+
+    def pubdir(self):
+        return os.path.dirname(os.path.abspath(__file__))
 
     def add_text(self, column, text):
         self.text_storage.add_text(column, text)
 
     def render_image(self):
-        #print "render_iamge"
+        # print "render_iamge"
         self.text_storage.finish()
-        #image = QPixmap(768, 576)
-        #image.fill(QtCore.Qt.black)
-        #painter = QPainter(image)
+        # image = QPixmap(768, 576)
+        # image.fill(QtCore.Qt.black)
+        # painter = QPainter(image)
         #painter.setRenderHints(QPainter.RenderHint(
         #    QPainter.Antialiasing | QPainter.TextAntialiasing), True)
         #painter.setFont(self.default_font)
@@ -201,10 +405,10 @@ def main():
     arg_parser.add_subscriber_group()
     args = arg_parser.finalize()
 
-    #args.http_host, args.http_port = resolve_host(
-    #    args.http_host, args.http_port, args.address_family)
-    #args.chaosc_host, args.chaosc_port = resolve_host(
-    #    args.chaosc_host, args.chaosc_port, args.address_family)
+    # args.http_host, args.http_port = resolve_host(
+    # args.http_host, args.http_port, args.address_family)
+    # args.chaosc_host, args.chaosc_port = resolve_host(
+    # args.chaosc_host, args.chaosc_port, args.address_family)
 
     window = MainWindow(args)
     window.setWindowFlags(QtCore.Qt.FramelessWindowHint)
