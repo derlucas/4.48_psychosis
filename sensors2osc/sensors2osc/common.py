@@ -80,21 +80,24 @@ class Platform(object):
 def create_args(name):
     arg_parser = ArgParser(name)
     arg_parser.add_global_group()
-    main_group = arg_parser.add_argument_group("main")
-    arg_parser.add_argument(main_group, "-D", '--device',
-        help='device node under /dev')
-    arg_parser.add_argument(main_group, "-a", '--actor',
-        help='actor name')
-    arg_parser.add_argument(main_group, '-b', '--baudrate', type=int, default=115200, choices=sorted(serial.baudrate_constants.keys()),
-        help='selects the baudrate, default=115200, for valid values execute "import serial;print sorted(serial.baudrate_constants.keys())"')
     arg_parser.add_chaosc_group()
+    client_group = arg_parser.add_client_group()
+    arg_parser.add_argument(client_group, "-D", '--device',
+                            help='device node under /dev')
+    arg_parser.add_argument(client_group, "-a", '--actor',
+                            help='actor name')
+    arg_parser.add_argument(client_group, '-b', '--baudrate', type=int, default=115200, choices=sorted(serial.baudrate_constants.keys()),
+                            help='selects the baudrate, default=115200, for valid values execute "import serial;print sorted(serial.baudrate_constants.keys())"')
 
     args = arg_parser.finalize()
     return args
 
 
-def init():
-    args = create_args(os.path.basename(sys.argv[0]))
+def init(prog_name, port=None):
+    args = create_args(prog_name)
+    if port:
+        args.chaosc_host = "lucas"
+        args.chaosc_port = 6002
     platform = Platform(args)
     platform.connect()
     atexit.register(platform.close)
