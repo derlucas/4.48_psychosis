@@ -212,7 +212,6 @@ class EkgPlotWidget(QMainWindow):
     def got_message(self):
         while self.osc_sock.hasPendingDatagrams():
             data, address, port = self.osc_sock.readDatagram(self.osc_sock.pendingDatagramSize())
-            print data,address,port
             try:
                 osc_address, typetags, args = decode_osc(data, 0, len(data))
                 self.update(osc_address, args)
