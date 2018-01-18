@@ -18,6 +18,7 @@ public class ActorHeart {
     public ActorHeart() {
         imagePanel = new ImagePanel("/de/psychose/heart1_klein_inv.jpg", "/de/psychose/heart2_klein_inv.jpg");
         mainPanel.add(imagePanel);
+        mainPanel.setBackground(Main.backgroundColor);
     }
 
     public void update() {

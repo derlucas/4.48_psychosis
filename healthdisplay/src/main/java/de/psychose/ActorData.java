@@ -12,18 +12,9 @@ public class ActorData {
     private int airflow;
     private int ekg;
     private int emg;
-    private double temperature;
-    private double temperatureOffset;
+    private float temperature;
+    private float temperatureOffset;
     private boolean tommyHeartbeat;
-
-    private long timestampPulse = 0;
-    private long timestampHeartbeat = 0;
-    private long timestampOxygen = 0;
-    private long timestampTommyHeartbeat = 0;
-    private long timestampEkg = 0;
-    private long timestampEmg = 0;
-    private long timestampTemperature = 0;
-    private long timestampBreath = 0;
 
     public ActorData(String actor, String caption) {
         this.actor = actor;
@@ -43,7 +34,6 @@ public class ActorData {
     }
 
     public void setOxygen(int oxygen) {
-        timestampOxygen = System.currentTimeMillis();
         pulseData.setOxygen(oxygen);
     }
 
@@ -52,8 +42,12 @@ public class ActorData {
     }
 
     public void setHeartbeat(boolean heartbeat) {
-        timestampHeartbeat = System.currentTimeMillis();
         pulseData.setHeartbeat(heartbeat);
+        //TODO: this is a hack due to not working EKG
+/*        ekg++;
+        if (ekg == 256) {
+            ekg = 0;
+        } */
     }
 
     public int getPulse() {
@@ -61,7 +55,6 @@ public class ActorData {
     }
 
     public void setPulse(int pulse) {
-        timestampPulse = System.currentTimeMillis();
         pulseData.setPulse(pulse);
     }
 
@@ -71,7 +64,6 @@ public class ActorData {
 
     public void setAirflow(int airflow) {
         this.airflow = airflow;
-        this.timestampBreath = System.currentTimeMillis();
     }
 
     public int getEkg() {
@@ -80,7 +72,6 @@ public class ActorData {
 
     public void setEkg(int ekg) {
         this.ekg = ekg;
-        this.timestampEkg = System.currentTimeMillis();
     }
 
     public int getEmg() {
@@ -89,16 +80,14 @@ public class ActorData {
 
     public void setEmg(int emg) {
         this.emg = emg;
-        this.timestampEmg = System.currentTimeMillis();
     }
 
-    public double getTemperature() {
+    public float getTemperature() {
         return temperature;
     }
 
-    public void setTemperature(double temperature) {
+    public void setTemperature(float temperature) {
         this.temperature = temperature;
-        this.timestampTemperature = System.currentTimeMillis();
     }
 
     public boolean getTommyHeartbeat() {
@@ -107,56 +96,42 @@ public class ActorData {
 
     public void setTommyHeartbeat(boolean tommyHeartbeat) {
         this.tommyHeartbeat = tommyHeartbeat;
-        this.timestampTommyHeartbeat = System.currentTimeMillis();
     }
 
     public double getTemperatureOffset() {
         return temperatureOffset;
     }
 
-    public void setTemperatureOffset(double temperatureOffset) {
+    public void setTemperatureOffset(float temperatureOffset) {
         this.temperatureOffset = temperatureOffset;
-    }
-
-    public long getTimestampPulse() {
-        return timestampPulse;
-    }
-
-    public long getTimestampEkg() {
-        return timestampEkg;
-    }
-
-    public long getTimestampEmg() {
-        return timestampEmg;
-    }
-
-    public long getTimestampTemperature() {
-        return timestampTemperature;
-    }
-
-    public long getTimestampBreath() {
-        return timestampBreath;
     }
 
     @Override
     public String toString() {
         return "ActorData{" +
-                "actor='" + actor + '\'' +
-                ", caption='" + caption + '\'' +
-                ", airflow=" + airflow +
-                ", ekg=" + ekg +
-                ", emg=" + emg +
-                ", temperature=" + temperature +
-                ", temperatureOffset=" + temperatureOffset +
-                ", tommyHeartbeat=" + tommyHeartbeat +
-                ", timestampPulse=" + timestampPulse +
-                ", timestampHeartbeat=" + timestampHeartbeat +
-                ", timestampOxygen=" + timestampOxygen +
-                ", timestampTommyHeartbeat=" + timestampTommyHeartbeat +
-                ", timestampEkg=" + timestampEkg +
-                ", timestampEmg=" + timestampEmg +
-                ", timestampTemperature=" + timestampTemperature +
-                ", timestampBreath=" + timestampBreath +
-                '}';
+               "actor='" + actor + '\'' +
+               ", caption='" + caption + '\'' +
+               ", airflow=" + airflow +
+               ", ekg=" + ekg +
+               ", emg=" + emg +
+               ", temperature=" + temperature +
+               ", temperatureOffset=" + temperatureOffset +
+               ", tommyHeartbeat=" + tommyHeartbeat +
+               '}';
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) { return true; }
+        if (!(o instanceof ActorData)) { return false; }
+
+        ActorData actorData = (ActorData) o;
+
+        return !(actor != null ? !actor.equals(actorData.actor) : actorData.actor != null);
+    }
+
+    @Override
+    public int hashCode() {
+        return actor != null ? actor.hashCode() : 0;
     }
 }

@@ -4,6 +4,7 @@ import com.illposed.osc.OSCListener;
 import com.illposed.osc.OSCMessage;
 
 import javax.swing.*;
+import java.awt.*;
 import java.net.SocketException;
 import java.net.UnknownHostException;
 import java.util.Date;
@@ -13,6 +14,10 @@ import java.util.Date;
  * @date: 25.04.14 00:23
  */
 public class Main {
+
+    public static Color backgroundColor = Color.black;
+    private MainForm mainForm;
+    private ControlForm controlForm;
 
     public static void main(String[] args) {
         new Main();
@@ -26,35 +31,38 @@ public class Main {
 
         try {
             UIManager.setLookAndFeel("com.sun.java.swing.plaf.gtk.GTKLookAndFeel");
-        } catch (Exception e) {
+        }
+        catch (Exception e) {
             e.printStackTrace();
         }
 
         try {
-            final ChaOSCclient chaOSCclient = new ChaOSCclient("chaosc", 7110);
+            final ChaOSCclient chaOSCclient = new ChaOSCclient("chaosc.lan", 7110);
 
-            for(int i = 0; i < actorDatas.length; i++) {
-                addActorOSCListeners(chaOSCclient, actorDatas[i]);
+            for (ActorData actorData : actorDatas) {
+                addActorOSCListeners(chaOSCclient, actorData);
             }
 
             chaOSCclient.startReceiver();
 
-            new ControlForm(chaOSCclient, actorDatas);
-            new MainForm(actorDatas);
+            controlForm = new ControlForm(chaOSCclient, actorDatas);
+            mainForm = new MainForm(actorDatas);
 
-            Runtime.getRuntime().addShutdownHook(new Thread(new Runnable() {
-                @Override
-                public void run() {
-                    chaOSCclient.stopReceiver();
+            Runtime.getRuntime().addShutdownHook(new Thread(
+                new Runnable() {
+                    @Override
+                    public void run() {
+                        chaOSCclient.stopReceiver();
+                    }
                 }
-            }));
-
-        } catch (UnknownHostException | SocketException e) {
+            ));
+        }
+        catch (UnknownHostException | SocketException e) {
             e.printStackTrace();
         }
     }
 
-    private static void addActorOSCListeners(final ChaOSCclient chaOSCclient, final ActorData actorData) {
+    private void addActorOSCListeners(final ChaOSCclient chaOSCclient, final ActorData actorData) {
 
         chaOSCclient.addListener("/" + actorData.getActor().toLowerCase() + "/heartbeat", new OSCListener() {
             @Override
@@ -63,7 +71,7 @@ public class Main {
 
                     // set the beat ( 0 or 1 )
                     if (message.getArguments()[0] instanceof Integer) {
-                        actorData.setHeartbeat( (int)(message.getArguments()[0]) == 1);
+                        actorData.setHeartbeat((int) (message.getArguments()[0]) == 1);
                     }
 
                     // set the heartrate
@@ -78,6 +86,8 @@ public class Main {
                     if (message.getArguments()[2] instanceof Integer) {
                         actorData.setOxygen((int) (message.getArguments()[2]));
                     }
+
+                    Main.this.update();
                 }
             }
         });
@@ -87,6 +97,7 @@ public class Main {
             public void acceptMessage(Date time, OSCMessage message) {
                 if (message.getArguments().length == 1 && message.getArguments()[0] instanceof Integer) {
                     actorData.setEkg((int) (message.getArguments()[0]));
+                    Main.this.update();
                 }
             }
         });
@@ -96,6 +107,7 @@ public class Main {
             public void acceptMessage(Date time, OSCMessage message) {
                 if (message.getArguments().length == 1 && message.getArguments()[0] instanceof Integer) {
                     actorData.setEmg((int) (message.getArguments()[0]));
+                    Main.this.update();
                 }
             }
         });
@@ -105,6 +117,7 @@ public class Main {
             public void acceptMessage(Date time, OSCMessage message) {
                 if (message.getArguments().length == 1 && message.getArguments()[0] instanceof Float) {
                     actorData.setTemperature((float) (message.getArguments()[0]));
+                    Main.this.update();
                 }
             }
         });
@@ -114,16 +127,23 @@ public class Main {
             public void acceptMessage(Date time, OSCMessage message) {
                 if (message.getArguments().length == 1 && message.getArguments()[0] instanceof Integer) {
                     actorData.setAirflow((int) (message.getArguments()[0]));
+                    Main.this.update();
                 }
             }
         });
 
         //TODO: evtl muss das oben hier noch anders
-        chaOSCclient.addListener("/" + actorData.getActor().toLowerCase() + "/tommyheartbeat", new OSCListener() {
-            @Override
-            public void acceptMessage(Date time, OSCMessage message) {
-                actorData.setTommyHeartbeat(!actorData.getTommyHeartbeat());
-            }
-        });
+        chaOSCclient.addListener("/" + actorData.getActor().toLowerCase() + "/tommyheartbeat",
+                                 new OSCListener() {
+                                     @Override
+                                     public void acceptMessage(Date time, OSCMessage message) {
+                                         actorData.setTommyHeartbeat(!actorData.getTommyHeartbeat());
+                                         Main.this.update();
+                                     }
+                                 });
+    }
+
+    private void update() {
+        //mainForm.update();
     }
 }

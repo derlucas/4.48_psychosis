@@ -1,7 +1,6 @@
 package de.psychose;
 
 import javax.swing.*;
-import java.awt.*;
 import java.text.DecimalFormat;
 
 /**
@@ -20,8 +19,11 @@ public class ActorDisplay {
     private JLabel lblBreath;
     private JPanel mainPanel;
     private ActorData actorData;
-    private boolean showErrors = false;
     private DecimalFormat df = new DecimalFormat("#.0");
+
+    public ActorDisplay() {
+        mainPanel.setBackground(Main.backgroundColor);
+    }
 
     public void update() {
         if (actorData == null) {
@@ -36,30 +38,11 @@ public class ActorDisplay {
         lblOxy.setText(String.valueOf(actorData.getOxygen()));
         lblHeartbeat.setText(String.valueOf(actorData.getPulse()));
 
-        if (showErrors) {
-            checkTimeout(lblTemperature, actorData.getTimestampTemperature());
-            checkTimeout(lblPulse, actorData.getTimestampPulse());
-            checkTimeout(lblOxy, actorData.getTimestampPulse());
-            checkTimeout(lblHeartbeat, actorData.getTimestampPulse());
-            checkTimeout(lblEkg, actorData.getTimestampEkg());
-            checkTimeout(lblEmg, actorData.getTimestampEmg());
-            checkTimeout(lblBreath, actorData.getTimestampBreath());
-        }
     }
 
-    public void init(ActorData actorData, final boolean showErrors) {
+    public void init(ActorData actorData) {
         this.actorData = actorData;
         lblCaption.setText(actorData.getCaption());
-        this.showErrors = showErrors;
-    }
-
-    private void checkTimeout(final JLabel label, final long time) {
-        if (time < System.currentTimeMillis() - TIMEOUT_MILLISECONDS) {
-            label.setText("no data");
-            label.setForeground(Color.red);
-        } else {
-            label.setForeground(Color.white);
-        }
     }
 
 }
