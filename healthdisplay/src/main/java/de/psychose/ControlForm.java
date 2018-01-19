@@ -1,11 +1,13 @@
 package de.psychose;
 
+import com.illposed.osc.OSCMessage;
+import com.illposed.osc.OSCPortOut;
+
 import javax.swing.*;
-import javax.swing.event.ChangeEvent;
-import javax.swing.event.ChangeListener;
-import java.awt.event.ActionEvent;
-import java.util.Observable;
-import java.util.Observer;
+import java.io.IOException;
+import java.net.SocketException;
+import java.net.UnknownHostException;
+import java.util.Random;
 
 /**
  * @author: lucas
@@ -13,108 +15,136 @@ import java.util.Observer;
  */
 public class ControlForm extends JFrame {
 
-    private PulseControl pulse1;
-    private PulseControl pulse2;
-    private PulseControl pulse3;
+    private final int OXY_WOBBLE_WIDTH = 4;
+    private final int EMG_WOBBLE_WIDTH = 120;
+    private final int EKG_WOBBLE_WIDTH = 90;
+    private final float TEMP_WOBBLE_WIDTH = 0.1f;
+    private final int AIR_WOBBLE_WIDTH = 50;
+    private final int PULSE_WOBBLE_WIDTH = 10;
+
+    private final UpdateInterface updateInterface;
+    private final ActorData[] actorDatas;
+    private final OSCPortOut tommyOutPort;
+
+    private ActorControl actorControl1;
+    private ActorControl actorControl2;
+    private ActorControl actorControl3;
     private JPanel rootPanel;
-    private TemperatureControl temp1;
-    private TemperatureControl temp2;
-    private TemperatureControl temp3;
-    private JCheckBox checkBox1;
-    private JCheckBox checkBox2;
-    private JCheckBox checkBox3;
-    private JSlider slider1;
 
-    private final ChaOSCclient osCclient;
-    private Timer simulationTimer;
-    private Simulator simulator;
-
-    public ControlForm(ChaOSCclient chaOSCclient, final ActorData[] actorData) {
+    public ControlForm(UpdateInterface updateInterface) throws SocketException, UnknownHostException {
         super("HD Control");
-        this.osCclient = chaOSCclient;
-        this.simulator = new Simulator(chaOSCclient);
+        this.updateInterface = updateInterface;
+        tommyOutPort = new OSCPortOut();
+
+        actorDatas = new ActorData[3];
+        actorDatas[0] = new ActorData("merle", "Körper 1");
+        actorDatas[1] = new ActorData("uwe", "Körper 2");
+        actorDatas[2] = new ActorData("bjoern", "Körper 3");
 
         setContentPane(rootPanel);
         setResizable(false);
         setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE);
 
-        addActor(pulse1, temp1, actorData[0]);
-        addActor(pulse2, temp2, actorData[1]);
-        addActor(pulse3, temp3, actorData[2]);
-
         pack();
         setVisible(true);
 
-        simulationTimer = new Timer(200, new AbstractAction() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                simulator.tick();
-            }
-        });
+        new Timer(100, actionEvent -> updateInterface.update(actorDatas)).start();
 
-        final ChangeListener changeListener = new ChangeListener() {
-            @Override
-            public void stateChanged(ChangeEvent e) {
-                if (checkBox1.isSelected() || checkBox2.isSelected() || checkBox3.isSelected()) {
-                    simulationTimer.start();
-                }
-                else {
-                    simulationTimer.stop();
-                }
+        new Timer(500, actionEvent -> {
+            simulate(actorDatas[0]);
+            simulate(actorDatas[1]);
+            simulate(actorDatas[2]);
+        }).start();
 
-                if (checkBox1.isSelected()) {
-                    simulator.addActor(actorData[0]);
-                } else {
-                    simulator.removeActor(actorData[0]);
-                }
-                if (checkBox2.isSelected()) {
-                    simulator.addActor(actorData[1]);
-                } else {
-                    simulator.removeActor(actorData[1]);
-                }
-                if (checkBox3.isSelected()) {
-                    simulator.addActor(actorData[2]);
-                } else {
-                    simulator.removeActor(actorData[2]);
-                }
-            }
-        };
-        checkBox1.addChangeListener(changeListener);
-        checkBox2.addChangeListener(changeListener);
-        checkBox3.addChangeListener(changeListener);
+        Timer pulseTimer1 = new Timer(1000, actionEvent -> simulatePulse(actorDatas[0]));
+        pulseTimer1.start();
 
-        slider1.addChangeListener(new ChangeListener() {
-            @Override
-            public void stateChanged(ChangeEvent e) {
-                actorData[0].setAirflow(slider1.getValue());
-            }
-        });
+        Timer pulseTimer2 = new Timer(1000, actionEvent -> simulatePulse(actorDatas[1]));
+        pulseTimer2.start();
+
+        Timer pulseTimer3 = new Timer(1000, actionEvent -> simulatePulse(actorDatas[2]));
+        pulseTimer3.start();
+
+        // refresh the delays for the pulse simulation timers in a not that fast manner
+        new Timer(10000, actionEvent -> {
+            pulseTimer1.setDelay(60000 / Math.max(60, actorDatas[0].getPulse()));
+            pulseTimer2.setDelay(60000 / Math.max(60, actorDatas[1].getPulse()));
+            pulseTimer3.setDelay(60000 / Math.max(60, actorDatas[2].getPulse()));
+        }).start();
+
     }
 
-    private void addActor(final PulseControl pulse, final TemperatureControl temp, final ActorData actorData) {
-        pulse.addObserver(new Observer() {
-            @Override
-            public void update(Observable o, Object arg) {
-                if (arg instanceof PulseData) {
-                    final PulseData data = (PulseData) arg;
-                    osCclient.sendMessage("/" + actorData.getActor().toLowerCase() + "/heartbeat",
-                                          data.getHeartbeat() ? 1 : 0,
-                                          data.getPulse(), data.getOxygen());
+//    int oxy = 0; int ekg = 0; int emg = 0; double temp = 0;int air = 0; int pulse = 60;
 
-                    // TODO: delete this line, bc tommy will send the real events
-                    //osCclient.sendMessage("/" + actorData.getActor().toLowerCase() + "/tommyheartbeat");
-                }
-            }
-        });
+    private void simulate(ActorData actorData) {
+        if (!actorData.isSimulationEnabled()) return;
 
-        temp.addObserver(new Observer() {
-            @Override
-            public void update(Observable o, Object arg) {
-                if (arg instanceof Double) {
-                    double dbl = (double)arg;
-                    actorData.setTemperatureOffset((float)dbl);
-                }
-            }
-        });
+        Random random = new Random();
+        actorData.setOxygen(95 - OXY_WOBBLE_WIDTH / 2 + random.nextInt(OXY_WOBBLE_WIDTH));
+        actorData.setEkg(EKG_WOBBLE_WIDTH / 2 + random.nextInt(EKG_WOBBLE_WIDTH));
+        actorData.setEmg(EMG_WOBBLE_WIDTH / 2 + random.nextInt(EMG_WOBBLE_WIDTH));
+        actorData.setTemperature(actorData.getTemperatureOffset() - (TEMP_WOBBLE_WIDTH / 2 + random.nextDouble() / 2));
+        actorData.setAirflow(AIR_WOBBLE_WIDTH / 2 + random.nextInt(AIR_WOBBLE_WIDTH));
+        actorData.setPulse(actorData.getPulseOffset() - PULSE_WOBBLE_WIDTH / 2 + random.nextInt(PULSE_WOBBLE_WIDTH));
+//        actorData.setOxygen(oxy++ % 1000);
+//        actorData.setEkg(ekg++ % 1000);
+//        actorData.setEmg(emg++ % 1000);
+//        actorData.setTemperature(temp += 0.1);
+//        if(temp > 38.0) temp = 37.0;
+//        actorData.setPulse(pulse++);
+//        if(pulse > 220) pulse = 60;
+//        actorData.setAirflow(air++ % 1000);
+    }
+
+    private void simulatePulse(ActorData actorData) {
+        if (actorData.isSimulationEnabled()) {
+            actorData.setHeartbeat(!actorData.isHeartbeat());
+            actorData.setTommyHeartbeat(actorData.isHeartbeat());
+        }
+    }
+
+    void actorControlChanges(ActorControlChangeEvent event) {
+        int index;
+
+        switch (event.getActor()) {
+            case "merle":
+                index = 0;
+                break;
+            case "uwe":
+                index = 1;
+                break;
+            case "bjoern":
+                index = 2;
+                break;
+            default:
+                return;
+        }
+
+        actorDatas[index].setPulseOffset(event.getPulse());
+        actorDatas[index].setTemperatureOffset(event.getTemperature());
+        actorDatas[index].setSimulationEnabled(event.isSimulationEnabled());
+    }
+
+
+    void startBreathSimulation(ActorControl actorControl) {
+        if (actorControl == actorControl1) {
+
+        }
+    }
+
+    private void sendHeartBeat() {
+        try {
+            OSCMessage subscribeMessage = new OSCMessage("/tommyheartbeat");    //TODO: correct path?
+            tommyOutPort.send(subscribeMessage);
+        } catch (IOException e) {
+            System.out.println("could not send pulse OSC Message");
+            e.printStackTrace();
+        }
+    }
+
+    private void createUIComponents() {
+        this.actorControl1 = new ActorControl(this, "merle");
+        this.actorControl2 = new ActorControl(this, "uwe");
+        this.actorControl3 = new ActorControl(this, "bjoern");
     }
 }

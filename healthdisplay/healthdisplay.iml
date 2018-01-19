@@ -10,7 +10,8 @@
     </content>
     <orderEntry type="inheritedJdk" />
     <orderEntry type="sourceFolder" forTests="false" />
-    <orderEntry type="library" name="Maven: com.illposed.osc:javaosc-core:0.2" level="project" />
+    <orderEntry type="library" name="Maven: com.illposed.osc:javaosc-core:0.4" level="project" />
+    <orderEntry type="library" scope="PROVIDED" name="Maven: org.projectlombok:lombok:1.16.20" level="project" />
     <orderEntry type="library" name="Maven: com.intellij:forms_rt:7.0.3" level="project" />
     <orderEntry type="library" name="Maven: asm:asm-commons:3.0" level="project" />
     <orderEntry type="library" name="Maven: asm:asm-tree:3.0" level="project" />

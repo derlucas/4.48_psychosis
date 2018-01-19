@@ -12,28 +12,44 @@ import java.io.IOException;
  */
 public class ActorHeart {
     private JPanel mainPanel;
-    private ActorData[] actorDatas;
     private ImagePanel imagePanel;
+    private boolean heart1;
+    private boolean heart2;
+    private boolean heart3;
 
     public ActorHeart() {
         imagePanel = new ImagePanel("/de/psychose/heart1_klein_inv.jpg", "/de/psychose/heart2_klein_inv.jpg");
         mainPanel.add(imagePanel);
-        mainPanel.setBackground(Main.backgroundColor);
+        mainPanel.setBackground(Color.black);
     }
 
-    public void update() {
+    public void update(boolean heart1, boolean heart2, boolean heart3) {
+        this.heart1 = heart1;
+        this.heart2 = heart2;
+        this.heart3 = heart3;
         imagePanel.repaint();
     }
 
-    public void setActorDatas(final ActorData[] actorDatas) {
-        this.actorDatas = actorDatas;
+    public void update1(boolean heart1) {
+        this.heart1 = heart1;
+        imagePanel.repaint();
+    }
+
+    public void update2(boolean heart2) {
+        this.heart2 = heart2;
+        imagePanel.repaint();
+    }
+
+    public void update3(boolean heart3) {
+        this.heart3 = heart3;
+        imagePanel.repaint();
     }
 
     private class ImagePanel extends JPanel {
         private BufferedImage image1;
         private BufferedImage image2;
 
-        public ImagePanel(String imageA, String imageB) {
+        ImagePanel(String imageA, String imageB) {
             try {
                 image1 = ImageIO.read(getClass().getResourceAsStream(imageA));
                 image2 = ImageIO.read(getClass().getResourceAsStream(imageB));
@@ -45,14 +61,9 @@ public class ActorHeart {
         @Override
         protected void paintComponent(Graphics g) {
             super.paintComponent(g);
-
-            if (actorDatas != null) {
-                for (int i = 0; i < actorDatas.length; i++) {
-                    if (actorDatas[i] != null) {
-                        g.drawImage(actorDatas[i].getTommyHeartbeat() ? image1 : image2, 263 * i, 0, null, null);
-                    }
-                }
-            }
+            g.drawImage(heart1 ? image1 : image2, 0, 0, null, null);
+            g.drawImage(heart2 ? image1 : image2, 263, 0, null, null);
+            g.drawImage(heart3 ? image1 : image2, 263 * 2, 0, null, null);
         }
     }
 }
