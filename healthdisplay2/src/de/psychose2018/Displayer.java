@@ -45,16 +45,15 @@ public class Displayer extends PApplet {
     @Override
     public void setup() {
         frameRate(25);
-        printArray(PFont.list());
-
+        
         cam1 = new IPCapture(this, "http://192.168.1.50:/mjpg/video.mjpg", "", "");
         cam1.start();
-        cam2 = new IPCapture(this, "http://192.168.1.202:9001/stream.mjpeg", "", "");
+        cam2 = new IPCapture(this, "http://192.168.1.228:9001/stream.mjpeg", "", "");
         cam2.start();
         oscP5 = new OscP5(this, 12000);
-        netAddressTommy1 = new NetAddress("192.168.1.240", 5557);
-        netAddressTommy2 = new NetAddress("192.168.1.240", 5558);
-        netAddressTommy3 = new NetAddress("192.168.1.240", 5559);
+        netAddressTommy1 = new NetAddress("192.168.1.32", 5557);
+        netAddressTommy2 = new NetAddress("192.168.1.32", 5558);
+        netAddressTommy3 = new NetAddress("192.168.1.32", 5559);
 
         mainFont = createFont("Droid Sans Mono", 20);
         titleFont = createFont("Droid Sans Mono", 28);
@@ -100,7 +99,7 @@ public class Displayer extends PApplet {
         // display the actor datas
         for (int i = 0; i < actorDatas.size(); i++) {
             pushMatrix();
-            translate(0 + i * 263, 70);
+            translate(i * 263, 70);
             actorDisplays.get(i).display();
             popMatrix();
         }

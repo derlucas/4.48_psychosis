@@ -9,9 +9,6 @@
     </content>
     <orderEntry type="inheritedJdk" />
     <orderEntry type="sourceFolder" forTests="false" />
-    <orderEntry type="library" name="pde" level="project" />
-    <orderEntry type="library" name="core" level="project" />
-    <orderEntry type="library" name="jogl-all" level="project" />
     <orderEntry type="library" name="IPCapture" level="project" />
     <orderEntry type="library" name="themidibus" level="project" />
     <orderEntry type="library" name="gluegen-rt" level="project" />
@@ -19,5 +16,7 @@
     <orderEntry type="library" name="jogl-all-natives-linux-amd64" level="project" />
     <orderEntry type="library" name="oscP5" level="project" />
     <orderEntry type="library" scope="PROVIDED" name="Maven: org.projectlombok:lombok:1.16.20" level="project" />
+    <orderEntry type="library" name="core" level="project" />
+    <orderEntry type="library" name="jogl-all" level="project" />
   </component>
 </module>
